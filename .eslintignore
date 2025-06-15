@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production builds
+.next/
+out/
+dist/
+build/
+
+# Generated files
+lib/generated/
+prisma/generated/
+*.generated.*
+
+# Environment files
+.env*
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Vercel
+.vercel/
+
+# Public assets (usually don't need linting)
+public/
+
+# Config files
+*.config.js
+*.config.mjs
+next.config.js
+tailwind.config.js
+postcss.config.js
+
+# Logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity 

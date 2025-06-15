@@ -1,0 +1,214 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth.js required tables
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// SaaS Multi-tenancy model
+model Organization {
+  id                String        @id @default(cuid())
+  name              String
+  slug              String        @unique // For subdomain/URL identification
+  planType          PlanType      @default(BASIC)
+  employeeLimit     Int           @default(50)
+  billingStatus     BillingStatus @default(TRIAL)
+  subscriptionId    String?       @unique // Stripe subscription ID
+  customerId        String?       @unique // Stripe customer ID
+  trialEndsAt       DateTime?
+  subscriptionStart DateTime?
+  subscriptionEnd   DateTime?
+  isActive          Boolean       @default(true)
+  settings          Json? // Custom settings per organization
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  users       User[]
+  locations   Location[]
+  clockEvents ClockEvent[]
+  timesheets  Timesheet[]
+
+  @@map("organizations")
+}
+
+// Core application models
+model User {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String?
+  email          String    @unique // Global email uniqueness
+  emailVerified  DateTime?
+  image          String?
+  password       String?
+  role           UserRole  @default(EMPLOYEE)
+  isActive       Boolean   @default(true)
+  locationId     String?
+  employeeId     String? // Custom employee ID within organization
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location?    @relation(fields: [locationId], references: [id])
+  accounts     Account[]
+  sessions     Session[]
+  clockEvents  ClockEvent[]
+  timesheets   Timesheet[]
+  approvals    Timesheet[]  @relation("ApprovedBy")
+
+  @@map("users")
+}
+
+model Location {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  address        String
+  latitude       Float
+  longitude      Float
+  radius         Int      @default(10) // meters
+  qrCode         String?  @unique
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users        User[]
+  clockEvents  ClockEvent[]
+
+  @@map("locations")
+}
+
+model ClockEvent {
+  id             String      @id @default(cuid())
+  organizationId String
+  userId         String
+  type           ClockType
+  timestamp      DateTime    @default(now())
+  method         ClockMethod @default(MANUAL)
+  latitude       Float?
+  longitude      Float?
+  notes          String?
+  locationId     String?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+  location     Location?    @relation(fields: [locationId], references: [id])
+
+  @@map("clock_events")
+}
+
+model Timesheet {
+  id             String          @id @default(cuid())
+  organizationId String
+  userId         String
+  startDate      DateTime
+  endDate        DateTime
+  totalHours     Float           @default(0)
+  regularHours   Float           @default(0)
+  overtimeHours  Float           @default(0)
+  breakHours     Float           @default(0)
+  status         TimesheetStatus @default(PENDING)
+  approvedBy     String?
+  approvedAt     DateTime?
+  submittedAt    DateTime?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+  approver     User?        @relation("ApprovedBy", fields: [approvedBy], references: [id])
+
+  @@map("timesheets")
+}
+
+// Enums
+enum UserRole {
+  EMPLOYEE
+  MANAGER
+  ADMIN
+  SUPER_ADMIN // For platform administrators
+}
+
+enum ClockType {
+  CLOCK_IN
+  CLOCK_OUT
+  BREAK_START
+  BREAK_END
+}
+
+enum ClockMethod {
+  MANUAL
+  QR_CODE
+  GEOFENCE
+}
+
+enum TimesheetStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DRAFT
+}
+
+enum PlanType {
+  BASIC // 50 employees - $10/month
+  PROFESSIONAL // 100 employees - $20/month
+  ENTERPRISE // 100+ employees - $65/month
+}
+
+enum BillingStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  SUSPENDED
+}
