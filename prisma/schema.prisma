@@ -87,6 +87,7 @@ model User {
   emailVerified  DateTime?
   image          String?
   password       String?
+  phoneNumber    String? // Phone number for notifications and 2FA
   role           UserRole  @default(EMPLOYEE)
   isActive       Boolean   @default(true)
   locationId     String?

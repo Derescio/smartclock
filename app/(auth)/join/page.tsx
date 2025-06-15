@@ -43,9 +43,12 @@ function JoinOrganizationForm() {
         employeePassword: "",
         confirmPassword: "",
         employeeId: "",
+        phoneNumber: "",
+        isNotRobot: false,
+        honeypot: "", // Hidden field for bot detection
     })
 
-    const handleInputChange = (field: string, value: string) => {
+    const handleInputChange = (field: string, value: string | boolean) => {
         setFormData(prev => ({
             ...prev,
             [field]: value
@@ -106,7 +109,16 @@ function JoinOrganizationForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!isFormValid()) return
+        if (!isFormValid()) {
+            toast.error("Please complete all required fields including profile picture upload")
+            return
+        }
+
+        // Additional bot protection check
+        if (formData.honeypot !== "") {
+            toast.error("Suspicious activity detected. Please try again.")
+            return
+        }
 
         setIsLoading(true)
         try {
@@ -118,6 +130,7 @@ function JoinOrganizationForm() {
                     employeeName: formData.employeeName,
                     employeeEmail: formData.employeeEmail,
                     employeeId: formData.employeeId,
+                    phoneNumber: formData.phoneNumber,
                     employeePassword: formData.employeePassword,
                     avatarUrl: uploadedAvatar?.ufsUrl,
                     documents: uploadedDocuments.map(doc => ({
@@ -152,28 +165,49 @@ function JoinOrganizationForm() {
         return organizationInfo &&
             formData.employeeName &&
             formData.employeeEmail &&
+            formData.phoneNumber &&
             formData.employeePassword &&
-            formData.employeePassword === formData.confirmPassword
+            formData.employeePassword === formData.confirmPassword &&
+            formData.isNotRobot &&
+            formData.honeypot === "" &&
+            uploadedAvatar // Now required!
     }
 
     // Progress calculation
     const getProgress = () => {
-        switch (activeTab) {
-            case "organization": return organizationInfo ? 33 : 10
-            case "account": return isFormValid() ? 66 : 40
-            case "files": return 100
-            default: return 0
-        }
+        const orgComplete = organizationInfo ? 1 : 0
+        const accountFieldsComplete = (
+            formData.employeeName &&
+            formData.employeeEmail &&
+            formData.phoneNumber &&
+            formData.employeePassword &&
+            formData.employeePassword === formData.confirmPassword &&
+            formData.isNotRobot &&
+            formData.honeypot === ""
+        ) ? 1 : 0
+        const avatarComplete = uploadedAvatar ? 1 : 0
+
+        const totalProgress = (orgComplete + accountFieldsComplete + avatarComplete) / 3 * 100
+        return Math.round(totalProgress)
     }
 
     const getStepStatus = (step: string) => {
+        const accountComplete = organizationInfo &&
+            formData.employeeName &&
+            formData.employeeEmail &&
+            formData.phoneNumber &&
+            formData.employeePassword &&
+            formData.employeePassword === formData.confirmPassword &&
+            formData.isNotRobot &&
+            formData.honeypot === ""
+
         switch (step) {
             case "organization":
                 return organizationInfo ? "completed" : activeTab === "organization" ? "current" : "pending"
             case "account":
-                return isFormValid() ? "completed" : activeTab === "account" ? "current" : "pending"
+                return accountComplete ? "completed" : activeTab === "account" ? "current" : "pending"
             case "files":
-                return activeTab === "files" ? "current" : "pending"
+                return uploadedAvatar ? "completed" : activeTab === "files" ? "current" : "pending"
             default:
                 return "pending"
         }
@@ -254,7 +288,8 @@ function JoinOrganizationForm() {
                         <TabsTrigger value="files" disabled={!organizationInfo} className="flex items-center gap-2">
                             <UploadIcon className="h-4 w-4" />
                             Files
-                            {(uploadedAvatar || uploadedDocuments.length > 0) && <CheckCircleIcon className="h-4 w-4 text-green-600" />}
+                            <span className="text-red-500 text-xs">*</span>
+                            {uploadedAvatar && <CheckCircleIcon className="h-4 w-4 text-green-600" />}
                         </TabsTrigger>
                     </TabsList>
 
@@ -358,6 +393,21 @@ function JoinOrganizationForm() {
                             </div>
 
                             <div className="space-y-2">
+                                <Label htmlFor="phoneNumber">Phone Number</Label>
+                                <Input
+                                    id="phoneNumber"
+                                    type="tel"
+                                    value={formData.phoneNumber}
+                                    onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
+                                    placeholder="+1 (555) 123-4567"
+                                    required
+                                />
+                                <p className="text-xs text-gray-500">
+                                    Used for important account notifications and two-factor authentication
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
                                 <Label htmlFor="employeeId">Employee ID (Optional)</Label>
                                 <Input
                                     id="employeeId"
@@ -395,6 +445,39 @@ function JoinOrganizationForm() {
                                 <p className="text-red-600 text-sm">Passwords do not match</p>
                             )}
 
+                            {/* Bot Protection Section */}
+                            <div className="space-y-4 p-4 bg-blue-50 rounded-lg border">
+                                <h4 className="font-medium text-blue-900">Security Verification</h4>
+
+                                {/* Honeypot field - hidden from users but visible to bots */}
+                                <input
+                                    type="text"
+                                    name="website"
+                                    value={formData.honeypot}
+                                    onChange={(e) => handleInputChange("honeypot", e.target.value)}
+                                    style={{ display: 'none' }}
+                                    tabIndex={-1}
+                                    autoComplete="off"
+                                />
+
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        id="isNotRobot"
+                                        checked={formData.isNotRobot}
+                                        onChange={(e) => handleInputChange("isNotRobot", e.target.checked)}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        required
+                                    />
+                                    <Label htmlFor="isNotRobot" className="text-sm text-blue-800">
+                                        I confirm that I am not a robot and agree to the terms of service
+                                    </Label>
+                                </div>
+                                <p className="text-xs text-blue-600">
+                                    This helps us prevent automated registrations and keeps your organization secure
+                                </p>
+                            </div>
+
                             <Separator />
 
                             <div className="flex space-x-4">
@@ -403,9 +486,16 @@ function JoinOrganizationForm() {
                                     variant="outline"
                                     onClick={() => setActiveTab("files")}
                                     className="flex-1"
-                                    disabled={!isFormValid()}
+                                    disabled={!(organizationInfo &&
+                                        formData.employeeName &&
+                                        formData.employeeEmail &&
+                                        formData.phoneNumber &&
+                                        formData.employeePassword &&
+                                        formData.employeePassword === formData.confirmPassword &&
+                                        formData.isNotRobot &&
+                                        formData.honeypot === "")}
                                 >
-                                    Add Files (Optional)
+                                    Continue to Upload Profile Picture
                                 </Button>
                                 <Button
                                     type="submit"
@@ -415,6 +505,14 @@ function JoinOrganizationForm() {
                                     {isLoading ? "Creating Account..." : "Create Account"}
                                 </Button>
                             </div>
+
+                            {!uploadedAvatar && (
+                                <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
+                                    <p className="text-sm text-orange-700">
+                                        <strong>Note:</strong> You must upload a profile picture before completing registration.
+                                    </p>
+                                </div>
+                            )}
                         </form>
                     </TabsContent>
 
@@ -423,12 +521,23 @@ function JoinOrganizationForm() {
                         <div className="text-center">
                             <UploadIcon className="h-12 w-12 text-blue-600 mx-auto mb-4" />
                             <h3 className="text-lg font-semibold text-gray-900">Upload Your Files</h3>
-                            <p className="text-gray-600">Add your profile picture and any required documents</p>
+                            <p className="text-gray-600">Profile picture is required to complete registration</p>
+                            {!uploadedAvatar && (
+                                <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-md">
+                                    <p className="text-sm text-orange-700 font-medium">
+                                        ⚠️ Profile picture upload is required before you can complete registration
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Profile Picture Upload */}
                         <div className="space-y-4">
-                            <h4 className="font-medium text-gray-900">Profile Picture (Optional)</h4>
+                            <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                                <UserIcon className="h-4 w-4 text-red-500" />
+                                Profile Picture (Required)
+                                <span className="text-red-500">*</span>
+                            </h4>
                             {uploadedAvatar ? (
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                                     <div className="flex items-center justify-between">

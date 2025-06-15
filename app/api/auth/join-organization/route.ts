@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
       organizationSlug,
       employeeName,
       employeeEmail,
+      phoneNumber,
       employeePassword,
       employeeId,
       avatarUrl,
@@ -23,9 +24,18 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Validation
-    if (!organizationSlug || !employeeName || !employeeEmail || !employeePassword) {
+    if (!organizationSlug || !employeeName || !employeeEmail || !phoneNumber || !employeePassword) {
       return NextResponse.json(
-        { message: "All required fields must be provided" },
+        { message: "All required fields must be provided (organization, name, email, phone, password)" },
+        { status: 400 }
+      )
+    }
+
+    // Basic phone number validation (should contain digits and common phone characters)
+    const phoneRegex = /^[\+]?[(]?[\d\s\-\(\)\.]{10,}$/
+    if (!phoneRegex.test(phoneNumber.replace(/\s/g, ''))) {
+      return NextResponse.json(
+        { message: "Please provide a valid phone number" },
         { status: 400 }
       )
     }
@@ -103,12 +113,13 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(employeePassword, 12)
 
-    // Create employee user with avatar
+    // Create employee user with avatar and phone number
     const employee = await prisma.user.create({
       data: {
         organizationId: organization.id,
         name: employeeName,
         email: employeeEmail,
+        phoneNumber: phoneNumber,
         password: hashedPassword,
         role: "EMPLOYEE",
         employeeId: employeeId || null,
