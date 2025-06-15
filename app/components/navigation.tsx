@@ -81,7 +81,7 @@ export default function Navigation() {
                                 <ClockIcon className="h-6 w-6 text-white" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold text-blue-600 font-heading">SmartClock</h1>
+                                <h1 className="text-xl font-bold text-blue-600 font-heading">ClockWizard</h1>
                                 <p className="text-xs text-gray-500 hidden sm:block">{user.organizationName}</p>
                             </div>
                         </Link>

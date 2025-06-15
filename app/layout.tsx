@@ -15,7 +15,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "SmartClock - Employee Time Tracking",
+  title: "ClockWizard - Employee Time Tracking",
   description: "Modern time tracking and attendance management system",
 }
 
