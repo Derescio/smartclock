@@ -192,4 +192,6 @@ const RecentActivity = forwardRef<RecentActivityRef>((props, ref) => {
   )
 })
 
+RecentActivity.displayName = 'RecentActivity'
+
 export default RecentActivity
