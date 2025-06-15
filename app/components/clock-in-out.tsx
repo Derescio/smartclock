@@ -5,13 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ClockIcon, MapPinIcon, QrCodeIcon, AlertCircleIcon } from "lucide-react"
 import { toast } from "sonner"
-import type { ClockEvent } from "@/types"
 
 interface ClockStatus {
+  success: boolean
   currentStatus: string
   todaysHours: number
-  clockEvents: ClockEvent[]
-  lastEvent: ClockEvent | null
+  lastEvent: any
 }
 
 interface Location {
@@ -22,15 +21,11 @@ interface Location {
   radius?: number
 }
 
-interface ClockActionPayload {
-  action: string
-  method: string
-  latitude?: number
-  longitude?: number
-  locationId?: string
+interface ClockInOutProps {
+  onClockAction?: () => void
 }
 
-export default function ClockInOut() {
+export default function ClockInOut({ onClockAction }: ClockInOutProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -75,7 +70,7 @@ export default function ClockInOut() {
     const timer = setInterval(() => {
       setCurrentTime(new Date())
       // Refresh status every minute if clocked in
-      if (clockStatus?.currentStatus === "CLOCKED_IN" || clockStatus?.currentStatus === "ON_BREAK") {
+      if (clockStatus?.success && (clockStatus.currentStatus === "CLOCKED_IN" || clockStatus.currentStatus === "ON_BREAK")) {
         if (new Date().getSeconds() === 0) {
           loadClockStatus()
         }
@@ -117,7 +112,7 @@ export default function ClockInOut() {
   const handleClockAction = async (type: string, method: string = "MANUAL") => {
     setLoading(true)
     try {
-      const payload: ClockActionPayload = { action: type, method }
+      const payload = { action: type, method } as any
 
       // Add GPS coordinates if available
       if (userLocation) {
@@ -169,18 +164,21 @@ export default function ClockInOut() {
 
         toast.success(successMessage)
         await loadClockStatus()
+
+        // Call the callback to refresh other components
+        onClockAction?.()
       } else {
         toast.error(data.error || "Clock operation failed")
       }
     } catch (error) {
-      toast.error("Failed to process clock operation" + error)
+      toast.error("Failed to process clock operation: " + error)
     } finally {
       setLoading(false)
     }
   }
 
   const getStatusDisplay = () => {
-    if (!clockStatus) return { text: "Loading...", color: "bg-gray-100 text-gray-800", dot: "bg-gray-500" }
+    if (!clockStatus?.success) return { text: "Loading...", color: "bg-gray-100 text-gray-800", dot: "bg-gray-500" }
 
     switch (clockStatus.currentStatus) {
       case "CLOCKED_IN":
@@ -200,7 +198,7 @@ export default function ClockInOut() {
   }
 
   const getAvailableActions = () => {
-    if (!clockStatus) return []
+    if (!clockStatus?.success) return []
 
     switch (clockStatus.currentStatus) {
       case "CLOCKED_OUT":
@@ -314,7 +312,7 @@ export default function ClockInOut() {
         )}
 
         {/* Today's Hours */}
-        {clockStatus && (
+        {clockStatus?.success && (
           <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Today's Hours:</span>

@@ -1,8 +1,17 @@
 'use server'
 
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { requireAuth } from "./auth"
+
+async function requireAuth() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    throw new Error("Authentication required")
+  }
+  return session.user
+}
 
 export async function clockIn(data: {
   method?: string

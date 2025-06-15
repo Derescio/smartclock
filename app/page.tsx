@@ -8,6 +8,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import type { SessionUser } from "@/types"
+import DashboardClient from "./components/dashboard-client"
 
 export default async function Dashboard() {
   const session = await getServerSession(authOptions)
@@ -71,62 +72,7 @@ export default async function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Clock In/Out */}
-          <div className="lg:col-span-2">
-            <ClockInOut />
-            <div className="mt-8">
-              <RecentActivity />
-            </div>
-          </div>
-
-          {/* Right Column - Stats and Info */}
-          <div className="space-y-6">
-            <QuickStats />
-
-            {/* Today's Schedule */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center font-heading">
-                  <CalendarIcon className="h-5 w-5 mr-2 text-blue-600" />
-                  Today's Schedule
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Shift Start</span>
-                    <span className="font-medium">9:00 AM</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Lunch Break</span>
-                    <span className="font-medium">12:00 PM</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Shift End</span>
-                    <span className="font-medium">5:00 PM</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-heading">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full btn-secondary">View Timesheet</Button>
-                <Button variant="outline" className="w-full">
-                  Request Time Off
-                </Button>
-                <Button variant="outline" className="w-full">
-                  Report Issue
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <DashboardClient />
       </main>
     </div>
   )

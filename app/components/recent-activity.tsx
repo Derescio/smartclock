@@ -1,33 +1,44 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useImperativeHandle, forwardRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ClockIcon, LogInIcon, LogOutIcon, PlayIcon, PauseIcon } from "lucide-react"
+import { getTodaysClockEvents } from "@/actions"
 
 interface ClockEvent {
   id: string
   type: string
-  timestamp: string
+  timestamp: Date
   method: string
   location?: {
+    id: string
     name: string
-  }
+    address: string
+    latitude: number
+    longitude: number
+    radius: number
+    qrCode: string | null
+    isActive: boolean
+    organizationId: string
+    createdAt: Date
+    updatedAt: Date
+  } | null
 }
 
-export default function RecentActivity() {
+interface RecentActivityRef {
+  refresh: () => void
+}
+
+const RecentActivity = forwardRef<RecentActivityRef>((props, ref) => {
   const [activities, setActivities] = useState<ClockEvent[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadRecentActivity()
-  }, [])
-
   const loadRecentActivity = async () => {
     try {
-      const response = await fetch("/api/clock")
-      if (response.ok) {
-        const data = await response.json()
-        setActivities(data.clockEvents.slice(-5).reverse()) // Show last 5 events, most recent first
+      setLoading(true)
+      const result = await getTodaysClockEvents()
+      if (result.success && result.clockEvents) {
+        setActivities(result.clockEvents.slice(-5).reverse()) // Show last 5 events, most recent first
       }
     } catch (error) {
       console.error("Failed to load recent activity:", error)
@@ -35,6 +46,14 @@ export default function RecentActivity() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadRecentActivity()
+  }, [])
+
+  useImperativeHandle(ref, () => ({
+    refresh: loadRecentActivity
+  }))
 
   const getActivityDisplay = (event: ClockEvent) => {
     switch (event.type) {
@@ -150,7 +169,7 @@ export default function RecentActivity() {
                     <div className="flex justify-between items-center">
                       <span className="font-medium">{display.label}</span>
                       <span className="text-sm text-gray-500">
-                        {formatTime(activity.timestamp)}
+                        {formatTime(activity.timestamp.toISOString())}
                       </span>
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-500">
@@ -171,4 +190,6 @@ export default function RecentActivity() {
       </CardContent>
     </Card>
   )
-}
+})
+
+export default RecentActivity
