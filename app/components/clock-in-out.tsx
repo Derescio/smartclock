@@ -10,7 +10,15 @@ interface ClockStatus {
   success: boolean
   currentStatus: string
   todaysHours: number
-  lastEvent: any
+  lastEvent: {
+    id: string;
+    type: string;
+    timestamp: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
+  } | null
 }
 
 interface Location {
@@ -21,11 +29,21 @@ interface Location {
   radius?: number
 }
 
-interface ClockInOutProps {
-  onClockAction?: () => void
+interface ClockEvent {
+  id: string;
+  type: 'CLOCK_IN' | 'CLOCK_OUT' | 'GEOFENCE';
+  timestamp: Date;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
-export default function ClockInOut({ onClockAction }: ClockInOutProps) {
+interface ClockInOutProps {
+  onClockEvent?: (event: ClockEvent) => void;
+}
+
+export default function ClockInOut({ onClockEvent }: ClockInOutProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -109,20 +127,25 @@ export default function ClockInOut({ onClockAction }: ClockInOutProps) {
     }
   }
 
-  const handleClockAction = async (type: string, method: string = "MANUAL") => {
+  const handleClockAction = async (action: 'CLOCK_IN' | 'CLOCK_OUT' | 'GEOFENCE', location?: GeolocationPosition) => {
     setLoading(true)
     try {
-      const payload = { action: type, method } as any
+      const payload: {
+        action: string;
+        latitude?: number;
+        longitude?: number;
+        locationId?: string;
+      } = { action: action }
 
       // Add GPS coordinates if available
-      if (userLocation) {
-        payload.latitude = userLocation.latitude
-        payload.longitude = userLocation.longitude
+      if (location) {
+        payload.latitude = location.coords.latitude
+        payload.longitude = location.coords.longitude
       }
 
       // Add location if GPS method and in range
-      if (method === "GEOFENCE") {
-        if (!userLocation) {
+      if (action === "GEOFENCE") {
+        if (!location) {
           toast.error("GPS location required for GPS check-in")
           return
         }
@@ -154,7 +177,7 @@ export default function ClockInOut({ onClockAction }: ClockInOutProps) {
       const data = await response.json()
 
       if (response.ok) {
-        const actionText = type.toLowerCase().replace('_', ' ')
+        const actionText = action.toLowerCase().replace('_', ' ')
         let successMessage = `Successfully ${actionText}`
 
         // Add location info for GPS check-ins
@@ -166,7 +189,15 @@ export default function ClockInOut({ onClockAction }: ClockInOutProps) {
         await loadClockStatus()
 
         // Call the callback to refresh other components
-        onClockAction?.()
+        onClockEvent?.({
+          id: data.eventId,
+          type: action === 'GEOFENCE' ? 'CLOCK_IN' : action,
+          timestamp: new Date(),
+          location: location ? {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          } : undefined,
+        })
       } else {
         toast.error(data.error || "Clock operation failed")
       }
@@ -254,7 +285,7 @@ export default function ClockInOut({ onClockAction }: ClockInOutProps) {
           {actions.map((action) => (
             <Button
               key={action.type}
-              onClick={() => handleClockAction(action.type)}
+              onClick={() => handleClockAction(action.type as 'CLOCK_IN' | 'CLOCK_OUT' | 'GEOFENCE')}
               variant={action.variant}
               className="w-full h-12 text-lg font-medium"
               disabled={loading}
@@ -297,7 +328,7 @@ export default function ClockInOut({ onClockAction }: ClockInOutProps) {
                 variant="outline"
                 size="sm"
                 className="flex-1"
-                onClick={() => handleClockAction("CLOCK_IN", "GEOFENCE")}
+                onClick={() => handleClockAction("GEOFENCE")}
                 disabled={loading || !userLocation || inRangeLocations.length === 0}
               >
                 <MapPinIcon className="h-4 w-4 mr-2" />

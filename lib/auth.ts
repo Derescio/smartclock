@@ -84,8 +84,18 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub!
+      if (session.user && token.sub) {
+        // Load fresh user data including avatar
+        const user = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: {
+            avatarUrl: true,
+            name: true,
+            email: true
+          }
+        });
+
+        session.user.id = token.sub
         session.user.role = token.role
         session.user.locationId = token.locationId
         session.user.organizationId = token.organizationId
@@ -93,6 +103,13 @@ export const authOptions: NextAuthOptions = {
         session.user.organizationSlug = token.organizationSlug
         session.user.planType = token.planType
         session.user.billingStatus = token.billingStatus
+        
+        // Update session with fresh avatar data
+        if (user) {
+          session.user.image = user.avatarUrl
+          session.user.name = user.name
+          session.user.email = user.email
+        }
       }
       return session
     }

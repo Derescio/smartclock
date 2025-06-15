@@ -64,6 +64,7 @@ model Organization {
   subscriptionEnd   DateTime?
   isActive          Boolean       @default(true)
   settings          Json? // Custom settings per organization
+  logoUrl           String? // Added for company logos
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -72,6 +73,7 @@ model Organization {
   locations   Location[]
   clockEvents ClockEvent[]
   timesheets  Timesheet[]
+  files       File[] // Added for organization files
 
   @@map("organizations")
 }
@@ -89,17 +91,19 @@ model User {
   isActive       Boolean   @default(true)
   locationId     String?
   employeeId     String? // Custom employee ID within organization
+  avatarUrl      String? // Added for profile images
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   // Relations
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  location     Location?    @relation(fields: [locationId], references: [id])
-  accounts     Account[]
-  sessions     Session[]
-  clockEvents  ClockEvent[]
-  timesheets   Timesheet[]
-  approvals    Timesheet[]  @relation("ApprovedBy")
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location      Location?    @relation(fields: [locationId], references: [id])
+  accounts      Account[]
+  sessions      Session[]
+  clockEvents   ClockEvent[]
+  timesheets    Timesheet[]
+  approvals     Timesheet[]  @relation("ApprovedBy")
+  uploadedFiles File[]       @relation("UploadedBy") // Added for file uploads
 
   @@map("users")
 }
@@ -171,6 +175,31 @@ model Timesheet {
   @@map("timesheets")
 }
 
+// New File model for managing uploads
+model File {
+  id           String   @id @default(cuid())
+  fileName     String // Generated unique filename
+  originalName String // Original filename from user
+  filePath     String // Public URL path to file
+  fileType     FileType // Type of file (logo, avatar, document)
+  fileSize     Int // File size in bytes
+  mimeType     String? // MIME type
+  description  String? // Optional description
+
+  // Relationships
+  uploadedById   String
+  uploadedBy     User         @relation("UploadedBy", fields: [uploadedById], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("files")
+}
+
 // Enums
 enum UserRole {
   EMPLOYEE
@@ -211,4 +240,14 @@ enum BillingStatus {
   PAST_DUE
   CANCELED
   SUSPENDED
+}
+
+enum FileType {
+  COMPANY_LOGO
+  EMPLOYEE_AVATAR
+  DOCUMENT
+  ONBOARDING_DOCUMENT
+  CONTRACT
+  POLICY
+  HANDBOOK
 }

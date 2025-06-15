@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
+interface DocumentUpload {
+  name: string
+  url: string
+  size: number
+  type: string
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -11,6 +18,8 @@ export async function POST(request: NextRequest) {
       employeeEmail,
       employeePassword,
       employeeId,
+      avatarUrl,
+      documents = []
     } = body
 
     // Validation
@@ -94,7 +103,7 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(employeePassword, 12)
 
-    // Create employee user
+    // Create employee user with avatar
     const employee = await prisma.user.create({
       data: {
         organizationId: organization.id,
@@ -103,14 +112,54 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         role: "EMPLOYEE",
         employeeId: employeeId || null,
+        avatarUrl: avatarUrl || null,
         isActive: true,
       }
     })
+
+    // Create file records for uploaded documents
+    if (documents && documents.length > 0) {
+      const fileRecords = documents.map((doc: DocumentUpload) => ({
+        fileName: doc.name,
+        originalName: doc.name,
+        filePath: doc.url,
+        fileType: "DOCUMENT" as const,
+        fileSize: doc.size,
+        mimeType: doc.type,
+        description: "Onboarding document uploaded during registration",
+        uploadedById: employee.id,
+        organizationId: organization.id,
+        isActive: true
+      }))
+
+      await prisma.file.createMany({
+        data: fileRecords
+      })
+    }
+
+    // If avatar was uploaded, create a file record for it too
+    if (avatarUrl) {
+      await prisma.file.create({
+        data: {
+          fileName: `avatar-${employee.id}`,
+          originalName: "Profile Picture",
+          filePath: avatarUrl,
+          fileType: "EMPLOYEE_AVATAR",
+          fileSize: 0, // Size not available from registration
+          mimeType: "image/*",
+          description: "Profile picture uploaded during registration",
+          uploadedById: employee.id,
+          organizationId: organization.id,
+          isActive: true
+        }
+      })
+    }
 
     return NextResponse.json({
       message: "Employee account created successfully",
       userId: employee.id,
       organizationName: organization.name,
+      filesUploaded: documents.length + (avatarUrl ? 1 : 0)
     })
 
   } catch (error) {
