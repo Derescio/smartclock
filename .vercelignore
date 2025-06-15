@@ -1,0 +1,16 @@
+# Don't ignore these important files
+!prisma/
+!lib/
+!types/
+!actions/
+!components/
+
+# Ignore these
+node_modules/
+.next/
+.git/
+*.log
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local 
