@@ -71,9 +71,11 @@ export async function clockIn(data: {
       },
     })
 
-    revalidatePath('/manager')
-    revalidatePath('/')
+    console.log('Clock in successful:', clockEvent)
 
+    // Only revalidate manager dashboard since that shows all employees
+    revalidatePath('/manager')
+    
     return {
       success: true,
       clockEvent,
@@ -126,8 +128,8 @@ export async function clockOut(data: {
 
     const todaysHours = await calculateTodaysHours(user.id, user.organizationId)
 
+    // Only revalidate manager dashboard since that shows all employees
     revalidatePath('/manager')
-    revalidatePath('/')
 
     return {
       success: true,
@@ -167,8 +169,8 @@ export async function startBreak(data: {
       },
     })
 
+    // Only revalidate manager dashboard since that shows all employees
     revalidatePath('/manager')
-    revalidatePath('/')
 
     return {
       success: true,
@@ -207,8 +209,8 @@ export async function endBreak(data: {
       },
     })
 
+    // Only revalidate manager dashboard since that shows all employees
     revalidatePath('/manager')
-    revalidatePath('/')
 
     return {
       success: true,

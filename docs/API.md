@@ -1,485 +1,679 @@
 # SmartClock API Documentation
 
-## 🔗 Base URL
-```
-Development: http://localhost:3000
-Production: https://your-domain.com
+## Overview
+
+SmartClock uses a **mixed architecture** combining server actions and API routes for optimal performance and developer experience:
+
+- **Server Actions**: For data mutations with automatic cache invalidation
+- **API Routes**: For client-side data fetching and real-time updates
+- **Type Safety**: All endpoints are fully typed with TypeScript
+
+## Base URL
+
+- **Development**: `http://localhost:3000`
+- **Production**: `https://clockwizard.vercel.app`
+
+## Authentication
+
+All API endpoints require authentication via NextAuth.js session cookies. The session includes organization context for multi-tenant isolation.
+
+### Session Structure
+
+```typescript
+interface SessionUser {
+  id: string
+  email: string
+  name: string
+  role: UserRole
+  organizationId: string
+  organizationName: string
+  organizationSlug: string
+  planType: PlanType
+  billingStatus: BillingStatus
+}
 ```
 
-## 🔐 Authentication
-All API endpoints (except public ones) require authentication via NextAuth.js session cookies.
+## Server Actions
 
-### Session Context
-Every authenticated request includes organization context:
+Server actions are the preferred method for data mutations as they provide automatic cache invalidation and type safety.
+
+### Clock Actions
+
+#### `clockIn(data: ClockInData)`
+
+Clock in a user with optional GPS validation.
+
+**Parameters:**
+```typescript
+interface ClockInData {
+  method?: 'MANUAL' | 'QR_CODE' | 'GEOFENCE'
+  latitude?: number
+  longitude?: number
+  locationId?: string
+  notes?: string
+}
+```
+
+**Response:**
 ```typescript
 {
-  user: {
-    id: string,
-    email: string,
-    name: string,
-    role: "EMPLOYEE" | "MANAGER" | "ADMIN",
-    organizationId: string,
-    organizationName: string,
-    organizationSlug: string,
-    planType: "BASIC" | "PROFESSIONAL" | "ENTERPRISE",
-    billingStatus: "TRIAL" | "ACTIVE" | "PAST_DUE"
+  success: boolean
+  clockEvent?: ClockEvent
+  currentStatus?: 'CLOCKED_IN'
+  locationValidation?: {
+    distance: number
+    locationName: string
   }
+  error?: string
 }
 ```
 
----
+**Example:**
+```typescript
+import { clockIn } from '@/actions'
 
-## 🏢 Organization Management
+const result = await clockIn({
+  method: 'GEOFENCE',
+  latitude: 40.7128,
+  longitude: -74.0059
+})
 
-### Register Organization
-Create a new organization with admin user.
+if (result.success) {
+  console.log('Clocked in successfully')
+} else {
+  console.error(result.error)
+}
+```
 
-**Endpoint**: `POST /api/auth/register-organization`
+#### `clockOut(data: ClockOutData)`
 
-**Request Body**:
-```json
+Clock out a user.
+
+**Parameters:**
+```typescript
+interface ClockOutData {
+  method?: 'MANUAL' | 'QR_CODE' | 'GEOFENCE'
+  latitude?: number
+  longitude?: number
+  locationId?: string
+  notes?: string
+}
+```
+
+**Response:**
+```typescript
 {
-  "organizationName": "Acme Corporation",
-  "organizationSlug": "acme-corp",
-  "planType": "PROFESSIONAL",
-  "ownerName": "John Doe",
-  "ownerEmail": "john@acme.com",
-  "ownerPassword": "securepassword",
-  "confirmPassword": "securepassword"
+  success: boolean
+  clockEvent?: ClockEvent
+  currentStatus?: 'CLOCKED_OUT'
+  todaysHours?: number
+  error?: string
 }
 ```
 
-**Response**:
+#### `startBreak(data: BreakData)`
+
+Start a break for the current user.
+
+**Parameters:**
+```typescript
+interface BreakData {
+  method?: 'MANUAL'
+  notes?: string
+}
+```
+
+**Response:**
+```typescript
+{
+  success: boolean
+  clockEvent?: ClockEvent
+  currentStatus?: 'ON_BREAK'
+  error?: string
+}
+```
+
+#### `endBreak(data: BreakData)`
+
+End the current break.
+
+**Parameters:**
+```typescript
+interface BreakData {
+  method?: 'MANUAL'
+  notes?: string
+}
+```
+
+**Response:**
+```typescript
+{
+  success: boolean
+  clockEvent?: ClockEvent
+  currentStatus?: 'CLOCKED_IN'
+  error?: string
+}
+```
+
+#### `getCurrentStatus()`
+
+Get the current clock status for the authenticated user.
+
+**Response:**
+```typescript
+{
+  success: boolean
+  currentStatus: 'CLOCKED_IN' | 'CLOCKED_OUT' | 'ON_BREAK'
+  todaysHours: number
+  lastEvent?: ClockEvent
+  error?: string
+}
+```
+
+#### `getTodaysClockEvents(date?: string)`
+
+Get all clock events for today (or specified date).
+
+**Parameters:**
+- `date` (optional): Date string in YYYY-MM-DD format
+
+**Response:**
+```typescript
+{
+  success: boolean
+  clockEvents: ClockEvent[]
+  error?: string
+}
+```
+
+### Team Management Actions
+
+#### `getTeamStatus()`
+
+Get real-time status of all team members (Manager+ only).
+
+**Response:**
+```typescript
+{
+  success: boolean
+  teamMembers: TeamMember[]
+  teamStats: TeamStats
+  error?: string
+}
+```
+
+#### `getTeamActivity(date?: string)`
+
+Get team activity for a specific date (Manager+ only).
+
+**Response:**
+```typescript
+{
+  success: boolean
+  activities: TeamActivity[]
+  error?: string
+}
+```
+
+### Location Actions
+
+#### `getOrganizationLocations()`
+
+Get all locations for the current organization.
+
+**Response:**
+```typescript
+{
+  success: boolean
+  locations: Location[]
+  error?: string
+}
+```
+
+#### `createLocation(data: LocationData)`
+
+Create a new location (Admin only).
+
+**Parameters:**
+```typescript
+interface LocationData {
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+  radius: number
+  isActive: boolean
+}
+```
+
+#### `updateLocation(id: string, data: Partial<LocationData>)`
+
+Update an existing location (Admin only).
+
+#### `deleteLocation(id: string)`
+
+Delete a location (Admin only).
+
+### Organization Actions
+
+#### `getOrganizationStats()`
+
+Get organization statistics (Admin only).
+
+**Response:**
+```typescript
+{
+  success: boolean
+  stats: OrganizationStats
+  error?: string
+}
+```
+
+#### `updateOrganizationSettings(data: OrganizationSettings)`
+
+Update organization settings (Admin only).
+
+## API Routes
+
+API routes are used for client-side data fetching and real-time updates.
+
+### Clock API
+
+#### `GET /api/clock`
+
+Get current clock status for the authenticated user.
+
+**Response:**
 ```json
 {
   "success": true,
-  "message": "Organization created successfully",
-  "data": {
-    "organizationId": "uuid",
-    "userId": "uuid"
+  "currentStatus": "CLOCKED_OUT",
+  "todaysHours": 7.5,
+  "lastEvent": {
+    "id": "clk_123",
+    "type": "CLOCK_OUT",
+    "timestamp": "2024-01-15T17:00:00Z",
+    "method": "GEOFENCE",
+    "location": {
+      "name": "Main Office"
+    }
   }
 }
 ```
 
-**Validation**:
-- Organization slug must be unique
-- Email must be unique globally
-- Password minimum 6 characters
-- Plan type must be valid enum
+#### `POST /api/clock`
 
----
+Perform a clock action (in, out, break start/end).
 
-### Join Organization
-Add employee to existing organization.
-
-**Endpoint**: `POST /api/auth/join-organization`
-
-**Request Body**:
+**Request Body:**
 ```json
 {
-  "organizationSlug": "acme-corp",
-  "employeeName": "Jane Smith",
-  "employeeEmail": "jane@acme.com",
-  "employeePassword": "securepassword",
-  "confirmPassword": "securepassword",
-  "employeeId": "EMP001"
+  "action": "CLOCK_IN",
+  "method": "GEOFENCE",
+  "latitude": 40.7128,
+  "longitude": -74.0059,
+  "locationId": "loc_123",
+  "notes": "Starting work"
 }
 ```
 
-**Response**:
+**Response:**
 ```json
 {
   "success": true,
-  "message": "Successfully joined organization",
-  "data": {
-    "userId": "uuid",
-    "organizationName": "Acme Corporation"
-  }
-}
-```
-
----
-
-### Lookup Organization
-Find organization by slug for join flow.
-
-**Endpoint**: `GET /api/organizations/lookup?slug=acme-corp`
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "name": "Acme Corporation",
-    "slug": "acme-corp",
-    "planType": "PROFESSIONAL"
-  }
-}
-```
-
----
-
-## ⏰ Time Tracking
-
-### Clock In/Out
-Handle clock in, clock out, and break management.
-
-**Endpoint**: `POST /api/clock`
-
-**Request Body**:
-```json
-{
-  "action": "CLOCK_IN" | "CLOCK_OUT" | "BREAK_START" | "BREAK_END",
-  "method": "MANUAL" | "GEOFENCE" | "QR_CODE",
-  "coordinates": {
-    "latitude": 40.7128,
-    "longitude": -74.0059
+  "clockEvent": {
+    "id": "clk_456",
+    "type": "CLOCK_IN",
+    "timestamp": "2024-01-15T09:00:00Z",
+    "method": "GEOFENCE"
   },
-  "locationId": "uuid" // optional, auto-detected if within range
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "message": "Clocked in successfully",
-  "data": {
-    "clockEvent": {
-      "id": "uuid",
-      "type": "CLOCK_IN",
-      "timestamp": "2024-01-15T09:00:00Z",
-      "method": "GEOFENCE",
-      "locationId": "uuid",
-      "coordinates": {
-        "latitude": 40.7128,
-        "longitude": -74.0059
-      }
-    },
-    "newStatus": "CLOCKED_IN",
-    "todayHours": 0,
-    "breakTime": 0
-  },
+  "currentStatus": "CLOCKED_IN",
   "locationValidation": {
-    "distance": 5.2,
+    "distance": 5,
     "locationName": "Main Office"
   }
 }
 ```
 
-**State Transitions**:
-- `CLOCKED_OUT` → `CLOCK_IN` → `CLOCKED_IN`
-- `CLOCKED_IN` → `BREAK_START` → `ON_BREAK`
-- `ON_BREAK` → `BREAK_END` → `CLOCKED_IN`
-- `CLOCKED_IN` → `CLOCK_OUT` → `CLOCKED_OUT`
+### Location API
 
-**Validation**:
-- GPS coordinates required for GEOFENCE method
-- Must be within 10m of work location
-- State transitions must be valid
-- Cannot clock in if already clocked in
+#### `GET /api/locations`
 
----
+Get organization locations with distance calculations.
 
-### Get Clock Status
-Get current status and today's events.
+**Query Parameters:**
+- `latitude` (optional): User's latitude for distance calculation
+- `longitude` (optional): User's longitude for distance calculation
 
-**Endpoint**: `GET /api/clock`
-
-**Response**:
+**Response:**
 ```json
 {
   "success": true,
-  "data": {
-    "currentStatus": "CLOCKED_IN",
-    "todayEvents": [
-      {
-        "id": "uuid",
-        "type": "CLOCK_IN",
-        "timestamp": "2024-01-15T09:00:00Z",
-        "method": "GEOFENCE",
-        "location": {
-          "name": "Main Office",
-          "address": "123 Business St"
-        }
-      }
-    ],
-    "todayHours": 4.5,
-    "breakTime": 0.5,
-    "clockedInAt": "2024-01-15T09:00:00Z",
-    "lastBreakStart": null
-  }
-}
-```
-
----
-
-## 📍 Location Management
-
-### Get Locations
-Get all organization locations with distance calculations.
-
-**Endpoint**: `GET /api/locations`
-
-**Query Parameters**:
-- `lat` (optional): User latitude for distance calculation
-- `lng` (optional): User longitude for distance calculation
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": [
+  "locations": [
     {
-      "id": "uuid",
+      "id": "loc_123",
       "name": "Main Office",
-      "address": "123 Business St, City, State",
+      "address": "123 Business St",
       "latitude": 40.7128,
       "longitude": -74.0059,
       "radius": 10,
-      "qrCode": "QR_CODE_STRING",
-      "distance": 5.2, // only if lat/lng provided
-      "inRange": true   // only if lat/lng provided
+      "distance": 5,
+      "inRange": true
     }
   ]
 }
 ```
 
----
+### Team API (Manager+ only)
 
-### Create Location
-Create new work location (Admin/Manager only).
+#### `GET /api/team/status`
 
-**Endpoint**: `POST /api/locations`
+Get real-time team status.
 
-**Request Body**:
-```json
-{
-  "name": "Branch Office",
-  "address": "456 Branch Ave, City, State",
-  "latitude": 40.7589,
-  "longitude": -73.9851,
-  "radius": 10
-}
-```
-
-**Response**:
+**Response:**
 ```json
 {
   "success": true,
-  "message": "Location created successfully",
-  "data": {
-    "id": "uuid",
-    "name": "Branch Office",
-    "qrCode": "GENERATED_QR_CODE"
-  }
-}
-```
-
-**Permissions**: MANAGER or ADMIN role required
-
----
-
-### Verify Location
-Test GPS coordinates against geofences.
-
-**Endpoint**: `POST /api/locations/verify`
-
-**Request Body**:
-```json
-{
-  "latitude": 40.7128,
-  "longitude": -74.0059
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "validLocations": [
-      {
-        "id": "uuid",
-        "name": "Main Office",
-        "distance": 5.2,
-        "inRange": true
+  "teamMembers": [
+    {
+      "id": "user_123",
+      "name": "John Doe",
+      "email": "john@company.com",
+      "role": "EMPLOYEE",
+      "currentStatus": "CLOCKED_IN",
+      "clockedInAt": "2024-01-15T09:00:00Z",
+      "todayHours": 6.5,
+      "location": {
+        "id": "loc_123",
+        "name": "Main Office"
       }
-    ],
-    "nearestLocation": {
-      "id": "uuid",
-      "name": "Main Office",
-      "distance": 5.2
     }
+  ],
+  "teamStats": {
+    "totalEmployees": 10,
+    "currentlyWorking": 8,
+    "onBreak": 1,
+    "clockedOut": 1,
+    "totalHoursToday": 52.5,
+    "averageHoursPerEmployee": 5.25
   }
 }
 ```
 
----
+#### `GET /api/team/activity`
 
-## 🛠️ Setup & Demo
+Get team activity for today or specified date.
 
-### Initialize Demo Data
-Create demo organizations and users for testing.
+**Query Parameters:**
+- `date` (optional): Date in YYYY-MM-DD format
 
-**Endpoint**: `POST /api/setup`
-
-**Response**:
+**Response:**
 ```json
 {
   "success": true,
-  "message": "Demo data created successfully",
-  "data": {
-    "organizations": [
-      {
-        "name": "Acme Corporation",
-        "slug": "acme-corp",
-        "planType": "PROFESSIONAL",
-        "users": 3,
-        "locations": 2
-      }
-    ]
-  }
+  "activities": [
+    {
+      "id": "activity_123",
+      "userId": "user_123",
+      "userName": "John Doe",
+      "action": "CLOCK_IN",
+      "timestamp": "2024-01-15T09:00:00Z",
+      "location": "Main Office",
+      "notes": "Starting work"
+    }
+  ]
 }
 ```
 
-**Demo Organizations Created**:
-- **Acme Corporation** (`acme-corp`) - Professional Plan
-- **TechStart Inc** (`techstart`) - Basic Plan
-- **Enterprise Solutions** (`enterprise-sol`) - Enterprise Plan
+## Authentication API
 
-**Demo Users** (password: `demo123`):
-- `admin@acme-corp.com` (Admin)
-- `manager@acme-corp.com` (Manager)
-- `alice@acme-corp.com` (Employee)
+### `POST /api/auth/signin`
 
----
+Sign in with credentials.
 
-## 📊 Response Format
-
-### Success Response
+**Request Body:**
 ```json
 {
-  "success": true,
-  "data": any,
-  "message": "Optional success message",
-  "locationValidation": { // GPS endpoints only
-    "distance": number,
-    "locationName": string
-  }
+  "email": "user@company.com",
+  "password": "password123"
 }
 ```
 
-### Error Response
+### `POST /api/auth/signout`
+
+Sign out the current user.
+
+### `GET /api/auth/session`
+
+Get the current session information.
+
+**Response:**
+```json
+{
+  "user": {
+    "id": "user_123",
+    "email": "user@company.com",
+    "name": "John Doe",
+    "role": "EMPLOYEE",
+    "organizationId": "org_123",
+    "organizationName": "Acme Corp",
+    "organizationSlug": "acme-corp",
+    "planType": "PROFESSIONAL",
+    "billingStatus": "ACTIVE"
+  },
+  "expires": "2024-02-15T12:00:00Z"
+}
+```
+
+## Error Handling
+
+All API endpoints follow a consistent error response format:
+
 ```json
 {
   "success": false,
   "error": "Error message",
-  "details": any // Optional additional details
+  "details": "Additional error details (optional)"
 }
 ```
 
----
+### Common Error Codes
 
-## 🚨 Error Codes
+| HTTP Status | Error Type | Description |
+|-------------|------------|-------------|
+| 400 | Bad Request | Invalid request parameters |
+| 401 | Unauthorized | Authentication required |
+| 403 | Forbidden | Insufficient permissions |
+| 404 | Not Found | Resource not found |
+| 409 | Conflict | Business logic conflict (e.g., already clocked in) |
+| 500 | Internal Server Error | Server-side error |
 
-### Authentication Errors
-- `401 Unauthorized`: No valid session
-- `403 Forbidden`: Insufficient permissions
+### Clock-Specific Errors
 
-### Validation Errors
-- `400 Bad Request`: Invalid input data
-- `409 Conflict`: Duplicate resource (email, slug)
-
-### Location Errors
-- `400 GPS_OUT_OF_RANGE`: User not within geofence
-- `400 INVALID_COORDINATES`: Invalid GPS coordinates
-- `400 NO_LOCATIONS_FOUND`: No work locations configured
-
-### Clock Errors
-- `400 INVALID_STATE_TRANSITION`: Invalid clock action for current state
-- `400 ALREADY_CLOCKED_IN`: Cannot clock in when already clocked in
-- `400 NOT_CLOCKED_IN`: Cannot perform action when not clocked in
-
----
-
-## 🧪 Testing
-
-### GPS Testing Tool
-**URL**: `/test-location`
-
-Interactive tool for testing GPS geofencing with:
-- Real-time coordinate input
-- Distance calculations
-- Validation results
-- All organization locations
-
-### Test Coordinates (10m radius)
-```javascript
-// Valid coordinates (within range)
-const validCoords = { lat: 40.7128, lng: -74.0059 };
-
-// Invalid coordinates (out of range)
-const invalidCoords = { lat: 40.7129, lng: -74.0060 };
+```json
+{
+  "success": false,
+  "error": "Cannot clock in from current status: CLOCKED_IN"
+}
 ```
 
-### Example API Calls
-```bash
-# Clock in with GPS
-curl -X POST http://localhost:3000/api/clock \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "CLOCK_IN",
+```json
+{
+  "success": false,
+  "error": "You are 25m away from Main Office. You must be within 10m to clock in."
+}
+```
+
+## Rate Limiting
+
+API endpoints are rate-limited to prevent abuse:
+
+- **Clock actions**: 10 requests per minute per user
+- **Status checks**: 60 requests per minute per user
+- **Location queries**: 30 requests per minute per user
+
+Rate limit headers are included in responses:
+
+```
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+X-RateLimit-Reset: 1642248000
+```
+
+## Webhooks (Planned)
+
+Future webhook support for real-time integrations:
+
+### Clock Events
+- `clock.in` - User clocked in
+- `clock.out` - User clocked out
+- `break.start` - Break started
+- `break.end` - Break ended
+
+### Webhook Payload
+```json
+{
+  "event": "clock.in",
+  "timestamp": "2024-01-15T09:00:00Z",
+  "organizationId": "org_123",
+  "user": {
+    "id": "user_123",
+    "name": "John Doe",
+    "email": "john@company.com"
+  },
+  "clockEvent": {
+    "id": "clk_456",
+    "type": "CLOCK_IN",
     "method": "GEOFENCE",
-    "coordinates": {
-      "latitude": 40.7128,
-      "longitude": -74.0059
+    "location": {
+      "name": "Main Office"
     }
-  }'
-
-# Get current status
-curl -X GET http://localhost:3000/api/clock
-
-# Verify location
-curl -X POST http://localhost:3000/api/locations/verify \
-  -H "Content-Type: application/json" \
-  -d '{
-    "latitude": 40.7128,
-    "longitude": -74.0059
-  }'
+  }
+}
 ```
 
----
+## SDK Examples
 
-## 🔒 Security Notes
+### JavaScript/TypeScript
 
-### GPS Validation
-- All location validation happens server-side
-- 10m precision prevents location spoofing
-- Coordinates are validated against organization locations only
+```typescript
+// Using server actions (recommended)
+import { clockIn, getCurrentStatus } from '@/actions'
 
-### Data Isolation
-- All endpoints filter by organization context
-- No cross-organization data access possible
-- User can only access their organization's data
+// Clock in with GPS
+const result = await clockIn({
+  method: 'GEOFENCE',
+  latitude: 40.7128,
+  longitude: -74.0059
+})
 
-### Rate Limiting
-- Clock endpoints: 1 request per second
-- Location endpoints: 10 requests per minute
-- Setup endpoint: 1 request per hour (development only)
+// Get current status
+const status = await getCurrentStatus()
+```
 
----
+### Fetch API
 
-## 📋 Future Endpoints
+```javascript
+// Using API routes for client-side operations
+const response = await fetch('/api/clock', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    action: 'CLOCK_IN',
+    method: 'GEOFENCE',
+    latitude: 40.7128,
+    longitude: -74.0059
+  })
+})
 
-### Phase 3: Management Features
-- `GET /api/team/status` - Real-time team status
-- `GET /api/timesheets` - Get timesheets for approval
-- `PUT /api/timesheets/:id/approve` - Approve timesheet
-- `GET /api/reports/attendance` - Attendance reports
+const result = await response.json()
+```
 
-### Phase 4: Enterprise Features
-- `GET /api/analytics/dashboard` - Advanced analytics
-- `POST /api/integrations/webhook` - Webhook endpoints
-- `GET /api/audit/logs` - Audit trail access 
+### React Hook Example
+
+```typescript
+// Custom hook for clock operations
+function useClockActions() {
+  const [loading, setLoading] = useState(false)
+  
+  const clockIn = async (method: ClockMethod, coordinates?: Coordinates) => {
+    setLoading(true)
+    try {
+      const result = await clockInAction({
+        method,
+        latitude: coordinates?.latitude,
+        longitude: coordinates?.longitude
+      })
+      
+      if (result.success) {
+        toast.success('Clocked in successfully')
+        // Refresh UI components
+        onClockAction?.()
+      } else {
+        toast.error(result.error)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  return { clockIn, loading }
+}
+```
+
+## Testing
+
+### Test Environment
+
+- **Base URL**: `http://localhost:3000`
+- **Test Organization**: Use the seeded demo data
+
+### Example Test Scenarios
+
+```typescript
+// Test clock in with valid GPS
+const result = await clockIn({
+  method: 'GEOFENCE',
+  latitude: 40.7128, // Within 10m of test location
+  longitude: -74.0059
+})
+
+expect(result.success).toBe(true)
+expect(result.currentStatus).toBe('CLOCKED_IN')
+
+// Test clock in outside range
+const invalidResult = await clockIn({
+  method: 'GEOFENCE',
+  latitude: 40.7200, // Outside 10m range
+  longitude: -74.0100
+})
+
+expect(invalidResult.success).toBe(false)
+expect(invalidResult.error).toContain('must be within')
+```
+
+## Migration Guide
+
+### From API Routes to Server Actions
+
+If migrating from pure API routes to the mixed architecture:
+
+```typescript
+// Old: API route only
+const response = await fetch('/api/clock', {
+  method: 'POST',
+  body: JSON.stringify(data)
+})
+
+// New: Server action (preferred for mutations)
+import { clockIn } from '@/actions'
+const result = await clockIn(data)
+```
+
+### Maintaining Backward Compatibility
+
+API routes are maintained for backward compatibility and client-side operations. Both approaches are supported and can be used based on your needs.
+
+This API documentation provides comprehensive coverage of all SmartClock endpoints and integration patterns. The mixed architecture approach provides flexibility while maintaining type safety and performance. 

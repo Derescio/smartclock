@@ -1,342 +1,689 @@
-# SmartClock - Technical Documentation
+# SmartClock Technical Documentation
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
-### Multi-Tenant SaaS Platform
-SmartClock is built as a **multi-tenant SaaS platform** with complete data isolation between organizations. Each organization operates independently with their own users, locations, and time tracking data.
+SmartClock is a multi-tenant SaaS time tracking platform built with Next.js 15, featuring a sophisticated architecture that combines server actions and API routes for optimal performance and user experience.
 
-### Tech Stack
-- **Frontend**: Next.js 15 (App Router) + React 19
-- **Styling**: Tailwind CSS v3 + shadcn/ui components
-- **Backend**: Next.js API Routes
-- **Database**: PostgreSQL (Neon) + Prisma ORM
-- **Authentication**: NextAuth.js with JWT + Organization Context
-- **Deployment**: Vercel Ready
+### Core Architecture Principles
 
-### Project Structure
+1. **Multi-Tenant Isolation** - Complete data separation between organizations
+2. **Mixed Action Pattern** - Strategic use of server actions and API routes
+3. **Real-Time Updates** - Live data synchronization with smart caching
+4. **Type Safety** - 100% TypeScript with comprehensive type definitions
+5. **Centralized Business Logic** - All operations organized in actions hub
+
+## Technology Stack
+
+| Component | Technology | Version | Purpose |
+|-----------|------------|---------|---------|
+| **Framework** | Next.js | 15.3.3 | Full-stack React framework with App Router |
+| **Runtime** | React | 19 | UI library with concurrent features |
+| **Database** | PostgreSQL | Latest | Primary data store |
+| **ORM** | Prisma | 6.9+ | Type-safe database access |
+| **Authentication** | NextAuth.js | 5.0+ | Session management and auth |
+| **Styling** | Tailwind CSS | 3.4+ | Utility-first CSS framework |
+| **UI Components** | shadcn/ui | Latest | Accessible component library |
+| **TypeScript** | TypeScript | 5.0+ | Type safety and developer experience |
+| **Deployment** | Vercel | Latest | Serverless deployment platform |
+
+## Project Structure
+
 ```
 smartclock/
-├── app/                    # Next.js App Router
-│   ├── api/               # API endpoints
-│   │   ├── auth/          # Authentication (register, join, signin)
-│   │   ├── clock/         # Time tracking endpoints
-│   │   ├── locations/     # Location management & verification
-│   │   ├── organizations/ # Organization lookup
-│   │   └── setup/         # Demo data initialization
-│   ├── auth/              # Authentication pages
-│   ├── components/        # React components
-│   ├── test-location/     # GPS testing tool
-│   └── page.tsx           # Main dashboard
-├── components/ui/         # shadcn/ui components
-├── lib/                   # Utilities and configurations
-├── prisma/               # Database schema and migrations
-├── docs/                 # Documentation
-└── types/                # TypeScript definitions
+├── actions/                    # Centralized server actions hub (1,500+ lines)
+│   ├── auth.ts                # Authentication & session management (110 lines)
+│   ├── clock.ts               # Time tracking & GPS validation (456 lines)
+│   ├── team.ts                # Team management & analytics (361 lines)
+│   ├── locations.ts           # Location & geofencing (280 lines)
+│   ├── organizations.ts       # Multi-tenant operations (331 lines)
+│   ├── index.ts               # Unified exports (75 lines)
+│   └── README.md              # Actions documentation (230 lines)
+├── app/
+│   ├── api/                   # API routes for client-side operations
+│   │   ├── auth/              # NextAuth.js configuration
+│   │   ├── clock/             # Time tracking endpoints
+│   │   └── locations/         # Location services
+│   ├── components/            # Reusable UI components
+│   │   ├── clock-in-out.tsx   # Main time tracking interface
+│   │   ├── recent-activity.tsx # Live activity feed
+│   │   ├── dashboard-client.tsx # Client-side dashboard coordinator
+│   │   └── ...
+│   ├── manager/               # Manager dashboard
+│   │   └── page.tsx           # Team management interface
+│   ├── globals.css            # Global styles
+│   ├── layout.tsx             # Root layout with providers
+│   └── page.tsx               # Employee dashboard
+├── docs/                      # Comprehensive documentation (2,674+ lines)
+│   ├── TECHNICAL.md           # Architecture & implementation (342 lines)
+│   ├── API.md                 # Complete API reference (485 lines)
+│   ├── USER_GUIDE.md          # End-user documentation (249 lines)
+│   ├── TESTING_GUIDE.md       # Testing strategies (393 lines)
+│   ├── FEATURES_ROADMAP.md    # Development roadmap (215 lines)
+│   └── lessons.md             # Development lessons (259 lines)
+├── lib/                       # Utilities and configurations
+│   ├── auth.ts                # NextAuth configuration
+│   ├── prisma.ts              # Database client
+│   └── utils.ts               # Utility functions
+├── prisma/                    # Database schema and migrations
+│   ├── schema.prisma          # Database schema (215 lines)
+│   └── seed.ts                # Database seeding
+├── types/                     # TypeScript type definitions
+│   └── index.ts               # Comprehensive types (278 lines)
+└── README.md                  # Project overview (223 lines)
 ```
 
-## 🗄️ Multi-Tenant Database Schema
+## Centralized Actions Hub
 
-### Core Models
+### Architecture Pattern
 
-#### Organizations (Tenants)
-- **Purpose**: Root tenant entity with billing and plan information
-- **Key Fields**: name, slug, planType, employeeLimit, billingStatus, trialEndsAt
-- **Plans**: BASIC (50 employees), PROFESSIONAL (100), ENTERPRISE (unlimited)
-- **Billing**: TRIAL (14 days), ACTIVE, PAST_DUE, CANCELED, SUSPENDED
+All business logic is centralized in the `actions/` folder, providing a single source of truth for all operations:
 
-#### Users (Organization-Scoped)
-- **Purpose**: Employees, managers, and admins within organizations
-- **Key Fields**: organizationId, email, role, locationId, isActive
-- **Roles**: EMPLOYEE, MANAGER, ADMIN, SUPER_ADMIN
-- **Uniqueness**: Email unique within organization (not globally)
-
-#### Locations (GPS Geofencing)
-- **Purpose**: Physical work locations with 10m precision geofencing
-- **Key Fields**: organizationId, name, address, latitude, longitude, radius (10m)
-- **Features**: QR code generation, distance calculation, in-range validation
-
-#### ClockEvents (Time Tracking)
-- **Purpose**: Individual clock in/out/break events with GPS validation
-- **Key Fields**: organizationId, userId, type, timestamp, method, coordinates, locationId
-- **Types**: CLOCK_IN, CLOCK_OUT, BREAK_START, BREAK_END
-- **Methods**: MANUAL, QR_CODE, GEOFENCE
-- **Validation**: State transitions, location verification
-
-#### Timesheets (Payroll Integration)
-- **Purpose**: Weekly/monthly time summaries for payroll
-- **Key Fields**: organizationId, userId, date range, hours breakdown, status
-- **Status**: PENDING, APPROVED, REJECTED, DRAFT
-- **Calculations**: Regular hours, overtime, break time deduction
-
-### Data Isolation Strategy
-- All models include `organizationId` foreign key
-- Cascade deletes ensure data integrity
-- API endpoints filter by organization context
-- No cross-organization data access possible
-
-## 🔌 API Design
-
-### Authentication Endpoints
-- `POST /api/auth/register-organization` - Create new organization (3-step wizard)
-- `POST /api/auth/join-organization` - Join existing organization
-- `GET /api/organizations/lookup` - Find organization by slug
-- `POST /api/auth/callback/credentials` - User login with organization context
-- `GET /api/auth/session` - Get current session with organization data
-
-### Time Tracking Endpoints
-- `POST /api/clock` - Clock in/out with GPS validation and state management
-- `GET /api/clock` - Get current status, today's events, and calculated hours
-- `GET /api/locations` - Get organization locations with distance calculations
-- `POST /api/locations/verify` - Test GPS coordinates against geofences
-- `POST /api/locations` - Create new location (Admin/Manager only)
-
-### Setup & Demo
-- `POST /api/setup` - Create demo organizations with sample data
-
-### Response Format
 ```typescript
-// Success Response
-{
-  success: true,
-  data: any,
-  message?: string,
-  locationValidation?: {
-    distance: number,
-    locationName: string
+// actions/index.ts - Unified exports
+export * from './auth'
+export * from './clock'
+export * from './team'
+export * from './locations'
+export * from './organizations'
+```
+
+### Key Benefits
+
+1. **Consistency** - All operations follow the same patterns
+2. **Maintainability** - Business logic is centralized and organized
+3. **Type Safety** - Shared types and interfaces
+4. **Reusability** - Actions can be used across different components
+5. **Testing** - Easier to test business logic in isolation
+
+### Action Structure
+
+Each action file follows a consistent pattern:
+
+```typescript
+// actions/clock.ts
+'use server'
+
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+import { revalidatePath } from "next/cache"
+
+async function requireAuth() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    throw new Error("Authentication required")
+  }
+  return session.user
+}
+
+export async function clockIn(data: ClockInData) {
+  try {
+    const user = await requireAuth()
+    
+    // Business logic with organization isolation
+    const clockEvent = await prisma.clockEvent.create({
+      data: {
+        organizationId: user.organizationId, // Critical for multi-tenancy
+        userId: user.id,
+        type: 'CLOCK_IN',
+        // ... other fields
+      }
+    })
+    
+    // Strategic cache invalidation
+    revalidatePath('/manager') // Only invalidate manager dashboard
+    
+    return { success: true, data: clockEvent }
+  } catch (error) {
+    return { success: false, error: error.message }
   }
 }
+```
 
-// Error Response
-{
-  success: false,
-  error: string,
-  details?: any
+## Mixed Architecture Pattern
+
+### Server Actions vs API Routes
+
+SmartClock uses a strategic combination of server actions and API routes:
+
+#### Server Actions (Preferred for Mutations)
+- **Purpose**: Data mutations with cache invalidation
+- **Benefits**: Direct database access, automatic revalidation, type safety
+- **Use Cases**: Clock in/out, user management, organization operations
+
+```typescript
+// Server action with revalidation
+export async function clockIn(data: ClockInData) {
+  // ... mutation logic
+  revalidatePath('/manager') // Cache invalidation
+  return { success: true, data }
 }
 ```
 
-## 🔐 Multi-Tenant Authentication
+#### API Routes (For Client-Side Operations)
+- **Purpose**: Client-side data fetching, real-time updates
+- **Benefits**: Standard HTTP interface, easier client-side integration
+- **Use Cases**: Status polling, location services, real-time updates
 
-### Organization Context in Sessions
 ```typescript
-// JWT Token includes:
-{
-  sub: userId,
-  role: "EMPLOYEE" | "MANAGER" | "ADMIN",
-  organizationId: string,
-  organizationName: string,
-  organizationSlug: string,
-  planType: "BASIC" | "PROFESSIONAL" | "ENTERPRISE",
-  billingStatus: "TRIAL" | "ACTIVE" | "PAST_DUE"
+// API route for client-side fetching
+export async function GET() {
+  const result = await getCurrentStatus()
+  return NextResponse.json(result)
+}
+```
+
+### Component Communication Pattern
+
+```typescript
+// Parent component coordinates updates
+const DashboardClient = () => {
+  const recentActivityRef = useRef<{ refresh: () => void }>(null)
+  
+  const handleClockAction = () => {
+    // Refresh related components
+    recentActivityRef.current?.refresh()
+  }
+  
+  return (
+    <>
+      <ClockInOut onClockAction={handleClockAction} />
+      <RecentActivity ref={recentActivityRef} />
+    </>
+  )
+}
+```
+
+## Database Schema
+
+### Multi-Tenant Design
+
+The database is designed with organization-level isolation:
+
+```prisma
+model Organization {
+  id                String        @id @default(cuid())
+  name              String
+  slug              String        @unique
+  planType          PlanType      @default(BASIC)
+  billingStatus     BillingStatus @default(TRIAL)
+  
+  // Relations
+  users       User[]
+  locations   Location[]
+  clockEvents ClockEvent[]
+  timesheets  Timesheet[]
+}
+
+model User {
+  id             String   @id @default(cuid())
+  organizationId String   // Critical for multi-tenancy
+  email          String   @unique
+  role           UserRole @default(EMPLOYEE)
+  
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  clockEvents  ClockEvent[]
+}
+
+model ClockEvent {
+  id             String      @id @default(cuid())
+  organizationId String      // Ensures data isolation
+  userId         String
+  type           ClockType
+  timestamp      DateTime    @default(now())
+  method         ClockMethod @default(MANUAL)
+  latitude       Float?
+  longitude      Float?
+  locationId     String?
+  
+  // Relations with organization isolation
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  location     Location?    @relation(fields: [locationId], references: [id])
+}
+```
+
+### Key Design Principles
+
+1. **Organization Isolation** - Every table includes `organizationId`
+2. **Audit Trail** - All events are logged with timestamps
+3. **Flexible Relationships** - Support for multiple locations per organization
+4. **Type Safety** - Enums for consistent data types
+
+## Authentication & Authorization
+
+### NextAuth.js Configuration
+
+```typescript
+// lib/auth.ts
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      async authorize(credentials) {
+        // Custom authentication logic
+        const user = await validateUser(credentials)
+        return user ? {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          organizationId: user.organizationId,
+          organizationName: user.organization.name,
+          // ... other organization data
+        } : null
+      }
+    })
+  ],
+  callbacks: {
+    jwt: async ({ token, user }) => {
+      if (user) {
+        // Store organization data in JWT
+        token.role = user.role
+        token.organizationId = user.organizationId
+        token.organizationName = user.organizationName
+        // ... other fields
+      }
+      return token
+    },
+    session: async ({ session, token }) => {
+      if (session.user && token) {
+        // Add organization context to session
+        session.user.id = token.sub!
+        session.user.role = token.role as UserRole
+        session.user.organizationId = token.organizationId as string
+        // ... other fields
+      }
+      return session
+    }
+  }
 }
 ```
 
 ### Role-Based Access Control
-- **Employee**: Clock in/out, view own data, break management
-- **Manager**: All employee permissions + team oversight, location management
-- **Admin**: All permissions + user management, organization settings
-- **Super Admin**: Platform administration (future)
 
-### Security Features
-- Organization-scoped data access
-- Server-side GPS validation
-- State transition validation
-- Input sanitization and validation
-- Audit trails for all operations
+```typescript
+// Middleware for role-based access
+export function requireRole(allowedRoles: UserRole[]) {
+  return async (req: Request) => {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user) {
+      throw new Error("Authentication required")
+    }
+    
+    if (!allowedRoles.includes(session.user.role)) {
+      throw new Error("Insufficient permissions")
+    }
+    
+    return session.user
+  }
+}
+```
 
-## 🗺️ GPS Geofencing Implementation
+## GPS & Location Services
 
 ### Location Validation Algorithm
+
 ```typescript
-// 10m precision geofencing
-function validateUserLocation(
+async function validateUserLocation(
   organizationId: string,
-  userLat: number,
-  userLng: number,
-  requestedLocationId?: string
-): Promise<ValidationResult>
-
-// Haversine distance calculation
-function calculateDistance(
-  lat1: number, lng1: number,
-  lat2: number, lng2: number
-): number // meters
+  userLatitude: number,
+  userLongitude: number
+): Promise<LocationValidationResult> {
+  // Get organization locations
+  const locations = await prisma.location.findMany({
+    where: { organizationId, isActive: true }
+  })
+  
+  // Find closest location
+  let closestLocation = null
+  let minDistance = Infinity
+  
+  for (const location of locations) {
+    const distance = calculateDistance(
+      userLatitude, userLongitude,
+      location.latitude, location.longitude
+    )
+    
+    if (distance < minDistance) {
+      minDistance = distance
+      closestLocation = location
+    }
+  }
+  
+  // Validate within radius
+  const isValid = minDistance <= (closestLocation?.radius || 10)
+  
+  return {
+    isValid,
+    distance: Math.round(minDistance),
+    locationName: closestLocation?.name,
+    error: isValid ? undefined : `You are ${Math.round(minDistance)}m away. Must be within ${closestLocation?.radius}m.`
+  }
+}
 ```
 
-### Geofencing Features
-- **10m Radius**: Extremely precise location validation
-- **Distance Calculation**: Real-time distance to all work locations
-- **In-Range Detection**: Automatic location selection
-- **Error Messages**: Detailed feedback with exact distances
-- **Testing Tool**: `/test-location` for GPS debugging
+### Distance Calculation (Haversine Formula)
 
-## 🚀 Real-Time Features
-
-### Clock Status Management
-- Real-time status updates (CLOCKED_OUT → CLOCKED_IN → ON_BREAK)
-- State transition validation
-- Automatic time calculations with break deduction
-- Live dashboard updates every second when clocked in
-
-### Time Calculations
 ```typescript
-// Automatic calculations include:
-- Total work time (excluding breaks)
-- Break time tracking
-- Overtime detection (>8 hours)
-- Real-time hour updates
-- Precise minute-level accuracy
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371e3 // Earth's radius in meters
+  const φ1 = (lat1 * Math.PI) / 180
+  const φ2 = (lat2 * Math.PI) / 180
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+  return R * c // Distance in meters
+}
 ```
 
-## 🛠️ Development Setup
+## Real-Time Features
 
-### Prerequisites
-- Node.js 18+
-- PostgreSQL database (Neon recommended)
-- Git
+### Smart Refresh Strategy
+
+```typescript
+// Real-time clock updates with optimization
+useEffect(() => {
+  const timer = setInterval(() => {
+    setCurrentTime(new Date())
+    
+    // Only refresh data on minute boundaries when clocked in
+    if (clockStatus?.success && 
+        (clockStatus.currentStatus === "CLOCKED_IN" || clockStatus.currentStatus === "ON_BREAK") &&
+        new Date().getSeconds() === 0) {
+      loadClockStatus()
+    }
+  }, 1000)
+  
+  return () => clearInterval(timer) // Prevent memory leaks
+}, [clockStatus])
+```
+
+### Component Synchronization
+
+```typescript
+// Ref-based component communication
+const RecentActivity = forwardRef<{ refresh: () => void }>((props, ref) => {
+  const loadRecentActivity = async () => {
+    const result = await getTodaysClockEvents()
+    if (result.success) {
+      setActivities(result.clockEvents.slice(-5).reverse())
+    }
+  }
+  
+  useImperativeHandle(ref, () => ({
+    refresh: loadRecentActivity
+  }))
+  
+  // ... component logic
+})
+```
+
+## Time Calculation Engine
+
+### Work Hours Calculation
+
+```typescript
+async function calculateTodaysHours(userId: string, organizationId: string): Promise<number> {
+  const startOfDay = new Date(new Date().toISOString().split("T")[0] + "T00:00:00.000Z")
+  const endOfDay = new Date(new Date().toISOString().split("T")[0] + "T23:59:59.999Z")
+
+  const events = await prisma.clockEvent.findMany({
+    where: {
+      userId,
+      organizationId, // Organization isolation
+      timestamp: { gte: startOfDay, lte: endOfDay }
+    },
+    orderBy: { timestamp: "asc" }
+  })
+
+  let totalMinutes = 0
+  let clockInTime: Date | null = null
+  let breakStartTime: Date | null = null
+
+  // Process events chronologically
+  for (const event of events) {
+    switch (event.type) {
+      case "CLOCK_IN":
+        clockInTime = event.timestamp
+        break
+      case "CLOCK_OUT":
+        if (clockInTime) {
+          totalMinutes += (event.timestamp.getTime() - clockInTime.getTime()) / (1000 * 60)
+          clockInTime = null
+        }
+        break
+      case "BREAK_START":
+        breakStartTime = event.timestamp
+        break
+      case "BREAK_END":
+        if (breakStartTime && clockInTime) {
+          const breakMinutes = (event.timestamp.getTime() - breakStartTime.getTime()) / (1000 * 60)
+          totalMinutes -= breakMinutes
+          breakStartTime = null
+        }
+        break
+    }
+  }
+
+  // Handle ongoing sessions
+  if (clockInTime) {
+    const now = new Date()
+    totalMinutes += (now.getTime() - clockInTime.getTime()) / (1000 * 60)
+    
+    // Subtract ongoing break time
+    if (breakStartTime) {
+      const breakMinutes = (now.getTime() - breakStartTime.getTime()) / (1000 * 60)
+      totalMinutes -= breakMinutes
+    }
+  }
+
+  return Math.max(0, totalMinutes / 60) // Return hours
+}
+```
+
+## Type Safety Implementation
+
+### Comprehensive Type Definitions
+
+```typescript
+// types/index.ts - 278 lines of type definitions
+
+// Authentication & User Types
+export interface SessionUser extends AuthUser {
+  image?: string | null
+}
+
+export interface AuthUser {
+  id: string
+  email: string
+  name: string
+  role: UserRole
+  locationId?: string
+  organizationId: string
+  organizationName: string
+  organizationSlug: string
+  planType: PlanType
+  billingStatus: BillingStatus
+}
+
+// Clock & Time Tracking Types
+export interface ClockAction {
+  method: 'MANUAL' | 'QR_CODE' | 'GEOFENCE'
+  latitude?: number
+  longitude?: number
+  locationId?: string
+  notes?: string
+}
+
+export interface ClockStatus {
+  currentStatus: 'CLOCKED_IN' | 'CLOCKED_OUT' | 'ON_BREAK'
+  clockedInAt?: string
+  lastBreakStart?: string
+  todayHours: number
+  breakTime: number
+  location?: {
+    id: string
+    name: string
+  }
+}
+
+// API Response Types
+export interface ApiResponse<T = any> {
+  success: boolean
+  data?: T
+  error?: string
+  message?: string
+}
+
+// NextAuth Type Extensions
+declare module 'next-auth' {
+  interface User {
+    id: string
+    role: UserRole
+    locationId?: string
+    organizationId: string
+    organizationName: string
+    organizationSlug: string
+    planType: PlanType
+    billingStatus: BillingStatus
+  }
+}
+```
+
+## Performance Optimizations
+
+### Cache Management Strategy
+
+1. **Strategic revalidatePath Usage**
+   ```typescript
+   // Only invalidate manager dashboard for team updates
+   revalidatePath('/manager') // Affects managers only
+   
+   // Use client-side refresh for individual users
+   onClockAction?.() // Callback-based updates
+   ```
+
+2. **Smart Data Fetching**
+   ```typescript
+   // Fetch only necessary date ranges
+   const startOfDay = new Date(targetDate + "T00:00:00.000Z")
+   const endOfDay = new Date(targetDate + "T23:59:59.999Z")
+   
+   const events = await prisma.clockEvent.findMany({
+     where: {
+       userId,
+       organizationId,
+       timestamp: { gte: startOfDay, lte: endOfDay }
+     }
+   })
+   ```
+
+3. **Component Optimization**
+   ```typescript
+   // Memoized calculations
+   const formatHours = useCallback((hours: number) => {
+     const h = Math.floor(hours)
+     const m = Math.floor((hours - h) * 60)
+     return `${h}h ${m}m`
+   }, [])
+   ```
+
+## Security Considerations
+
+### Multi-Tenant Data Isolation
+
+Every database query includes organization filtering:
+
+```typescript
+// Always include organizationId in queries
+const clockEvents = await prisma.clockEvent.findMany({
+  where: {
+    userId: user.id,
+    organizationId: user.organizationId, // Critical for security
+    timestamp: { gte: startOfDay, lte: endOfDay }
+  }
+})
+```
+
+### Input Validation
+
+```typescript
+// Server-side validation for all inputs
+export async function clockIn(data: ClockInData) {
+  // Validate required fields
+  if (!data.method) {
+    return { success: false, error: "Method is required" }
+  }
+  
+  // Validate GPS coordinates if provided
+  if (data.latitude && (data.latitude < -90 || data.latitude > 90)) {
+    return { success: false, error: "Invalid latitude" }
+  }
+  
+  // ... rest of validation
+}
+```
+
+### Location Data Privacy
+
+```typescript
+// Only store necessary location precision
+const clockEvent = await prisma.clockEvent.create({
+  data: {
+    latitude: data.latitude ? Math.round(data.latitude * 1000000) / 1000000 : null, // 6 decimal places
+    longitude: data.longitude ? Math.round(data.longitude * 1000000) / 1000000 : null,
+    // ... other fields
+  }
+})
+```
+
+## Deployment Architecture
+
+### Vercel Configuration
+
+```json
+// package.json
+{
+  "scripts": {
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate"
+  }
+}
+```
 
 ### Environment Variables
+
 ```env
-DATABASE_URL="postgresql://user:pass@host:5432/smartclock"
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="your-secret-key-here"
+# Database
+DATABASE_URL="postgresql://..."
+
+# Authentication
+NEXTAUTH_SECRET="your-secret-key"
+NEXTAUTH_URL="https://your-domain.com"
+
+# Optional: External Services
+RESEND_API_KEY="your-resend-key"
+STRIPE_SECRET_KEY="your-stripe-key"
 ```
 
-### Installation & Setup
-```bash
-# Clone and install
-git clone <repository>
-cd smartclock
-npm install
+### Build Optimization
 
-# Database setup
-npx prisma db push
-npx prisma generate
+```javascript
+// next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client']
+  }
+}
 
-# Create demo data
-curl -X POST http://localhost:3000/api/setup
-
-# Start development
-npm run dev
+module.exports = nextConfig
 ```
 
-### Database Migrations
-```bash
-# Create migration
-npx prisma migrate dev --name description
-
-# Apply migrations
-npx prisma migrate deploy
-
-# Reset database (development)
-npx prisma migrate reset
-```
-
-## 📱 Mobile-First Design
-
-### Responsive Strategy
-- **Mobile First**: < 768px (primary target)
-- **Tablet**: 768px - 1024px
-- **Desktop**: > 1024px
-
-### Mobile Optimizations
-- Touch-friendly buttons (min 44px)
-- GPS permission handling
-- Real-time location tracking
-- Offline-capable design (future)
-- Progressive Web App features (planned)
-
-## 🧪 Testing & Debugging
-
-### GPS Testing Tool
-- **URL**: `/test-location`
-- **Features**: Real-time GPS validation, distance calculations, geofence testing
-- **Test Coordinates**: Provided in testing guide
-
-### Demo Data
-- 3 organizations with different plans
-- Multiple users per organization
-- Sample locations with 10m geofences
-- Pre-configured clock events
-
-### Testing Strategy
-- Unit tests for business logic
-- Integration tests for API endpoints
-- GPS accuracy testing
-- Multi-tenant isolation verification
-
-## 🚀 Deployment
-
-### Vercel Deployment
-1. Connect GitHub repository
-2. Configure environment variables
-3. Deploy automatically on push
-4. Run setup endpoint for demo data
-
-### Database Hosting
-- **Neon**: PostgreSQL with automatic scaling (recommended)
-- **Supabase**: Alternative with built-in features
-- **Railway**: Simple PostgreSQL hosting
-
-### Production Checklist
-- [ ] Set production environment variables
-- [ ] Configure custom domain
-- [ ] Run database migrations
-- [ ] Initialize demo data
-- [ ] Test GPS functionality
-- [ ] Verify multi-tenant isolation
-
-## 🔍 Monitoring & Performance
-
-### Key Metrics
-- Clock-in success rate
-- GPS accuracy and validation time
-- API response times
-- Database query performance
-- Multi-tenant data isolation
-
-### Logging Strategy
-- Clock events with GPS coordinates
-- Authentication attempts
-- API errors and validation failures
-- Performance metrics
-
-## 🔒 Security Considerations
-
-### Multi-Tenant Security
-- Complete data isolation by organization
-- No cross-tenant data access
-- Organization context validation on all operations
-
-### GPS Security
-- Server-side location validation
-- 10m precision prevents spoofing
-- Location data encrypted in transit
-- Minimal GPS data retention
-
-### Authentication Security
-- JWT tokens with organization context
-- Role-based access control
-- Session management with NextAuth.js
-- Password hashing with bcrypt
-
----
-
-## 📋 Future Enhancements
-
-### Phase 3: Management Features
-- Manager dashboard with team oversight
-- Timesheet approval workflows
-- Advanced reporting and analytics
-- Employee management tools
-
-### Phase 4: Enterprise Features
-- Stripe billing integration
-- API access for integrations
-- Custom branding and white-labeling
-- Advanced compliance reporting
-
-### Technical Improvements
-- Offline capability with service workers
-- Real-time notifications
-- Advanced caching strategies
-- Performance optimizations 
+This technical documentation provides a comprehensive overview of the SmartClock architecture, implementation details, and best practices. The system is designed for scalability, maintainability, and security in a multi-tenant SaaS environment. 
