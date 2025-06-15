@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { UsersIcon, MapPinIcon, TrendingUpIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import Providers from "../components/providers"
 import Navigation from "../components/navigation"
 import TeamStatusServer from "./components/team-status-server"
@@ -73,10 +74,14 @@ export default async function ManagerDashboard() {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                <Button className="w-full btn-secondary">View All Employees</Button>
-                                <Button variant="outline" className="w-full">
-                                    Add New Employee
-                                </Button>
+                                <Link href="/manager/employees">
+                                    <Button className="w-full btn-secondary">View All Employees</Button>
+                                </Link>
+                                <Link href="/manager/employees/add">
+                                    <Button variant="outline" className="w-full">
+                                        Add New Employee
+                                    </Button>
+                                </Link>
                                 <Button variant="outline" className="w-full">
                                     Manage Schedules
                                 </Button>

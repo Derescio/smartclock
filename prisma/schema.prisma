@@ -74,6 +74,7 @@ model Organization {
   clockEvents ClockEvent[]
   timesheets  Timesheet[]
   files       File[] // Added for organization files
+  departments Department[]
 
   @@map("organizations")
 }
@@ -91,6 +92,7 @@ model User {
   role           UserRole  @default(EMPLOYEE)
   isActive       Boolean   @default(true)
   locationId     String?
+  departmentId   String? // Department/group assignment
   employeeId     String? // Custom employee ID within organization
   avatarUrl      String? // Added for profile images
   createdAt      DateTime  @default(now())
@@ -99,6 +101,8 @@ model User {
   // Relations
   organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   location      Location?    @relation(fields: [locationId], references: [id])
+  department    Department?  @relation("EmployeeDepartment", fields: [departmentId], references: [id])
+  managedDepts  Department[] @relation("DepartmentManager")
   accounts      Account[]
   sessions      Session[]
   clockEvents   ClockEvent[]
@@ -199,6 +203,26 @@ model File {
   updatedAt DateTime @updatedAt
 
   @@map("files")
+}
+
+// Department/Group model for organizing employees
+model Department {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  color          String? // For UI visualization (#hex color)
+  managerId      String? // Optional department manager
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  manager      User?        @relation("DepartmentManager", fields: [managerId], references: [id])
+  employees    User[]       @relation("EmployeeDepartment")
+
+  @@map("departments")
 }
 
 // Enums

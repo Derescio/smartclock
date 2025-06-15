@@ -325,7 +325,8 @@ export async function getAllTeamMembers() {
     },
     include: {
       location: true,
-      organization: true
+      organization: true,
+      department: true
     },
     orderBy: {
       name: 'asc'
