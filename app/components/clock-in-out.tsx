@@ -23,7 +23,7 @@ interface Location {
 }
 
 interface ClockActionPayload {
-  type: string
+  action: string
   method: string
   latitude?: number
   longitude?: number
@@ -117,7 +117,7 @@ export default function ClockInOut() {
   const handleClockAction = async (type: string, method: string = "MANUAL") => {
     setLoading(true)
     try {
-      const payload: ClockActionPayload = { type, method }
+      const payload: ClockActionPayload = { action: type, method }
 
       // Add GPS coordinates if available
       if (userLocation) {
