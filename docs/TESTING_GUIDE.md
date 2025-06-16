@@ -2,7 +2,7 @@
 
 ## Overview
 
-This comprehensive testing guide covers all aspects of testing the SmartClock SaaS platform, including multi-tenant isolation, GPS functionality, real-time features, and the mixed architecture pattern.
+This comprehensive testing guide covers all aspects of testing the SmartClock SaaS platform, including multi-tenant isolation, GPS functionality, real-time features, schedule management, timesheet system, team collaboration, and the mixed architecture pattern.
 
 ## Testing Environment Setup
 
@@ -184,9 +184,321 @@ const finalHours = await calculateTodaysHours(userId, organizationId)
 expect(finalHours).toBe(7.5)
 ```
 
+## Schedule Management Testing
+
+### Schedule Creation & Assignment
+
+#### Test 6: Schedule Creation Wizard
+**Objective**: Test 4-step schedule creation process
+
+**Test Steps**:
+1. **Step 1**: Basic Information
+   ```typescript
+   const scheduleData = {
+     title: "Morning Shift",
+     description: "Regular morning shift",
+     scheduleType: "SHIFT"
+   }
+   ```
+
+2. **Step 2**: Time & Recurrence
+   ```typescript
+   const timeData = {
+     startDate: "2024-01-15",
+     endDate: "2024-12-31",
+     startTime: "09:00",
+     endTime: "17:00",
+     breakDuration: 30,
+     isRecurring: true,
+     recurrence: "WEEKLY",
+     recurrenceDays: ["MON", "TUE", "WED", "THU", "FRI"]
+   }
+   ```
+
+3. **Step 3**: Assignment
+   ```typescript
+   const assignmentData = {
+     assignmentType: "TEAM",
+     teamId: "team-123"
+   }
+   ```
+
+4. **Step 4**: Review & Create
+   ```typescript
+   const result = await createSchedule({
+     ...scheduleData,
+     ...timeData,
+     ...assignmentData
+   })
+   expect(result.success).toBe(true)
+   ```
+
+#### Test 7: Multiple Assignment Types
+**Objective**: Verify all assignment types work correctly
+
+**Assignment Types to Test**:
+- Individual user assignment
+- Department-wide assignment
+- Location-based assignment
+- Team assignment
+
+**Test Steps**:
+```typescript
+// Test individual assignment
+const individualSchedule = await createSchedule({
+  title: "John's Schedule",
+  assignmentType: "INDIVIDUAL",
+  userId: "user-123"
+})
+
+// Test department assignment
+const deptSchedule = await createSchedule({
+  title: "Engineering Schedule",
+  assignmentType: "DEPARTMENT",
+  departmentId: "dept-123"
+})
+
+// Test location assignment
+const locationSchedule = await createSchedule({
+  title: "Office A Schedule",
+  assignmentType: "LOCATION",
+  locationId: "location-123"
+})
+
+// Test team assignment
+const teamSchedule = await createSchedule({
+  title: "Team Alpha Schedule",
+  assignmentType: "TEAM",
+  teamId: "team-123"
+})
+```
+
+#### Test 8: Recurring Schedule Logic
+**Objective**: Test recurring schedule day-of-week filtering
+
+**Test Scenario**:
+1. Create weekly recurring schedule for Monday-Friday
+2. Test schedule appears on weekdays
+3. Test schedule doesn't appear on weekends
+
+**Test Steps**:
+```typescript
+// Create recurring schedule
+const recurringSchedule = await createSchedule({
+  title: "Weekday Schedule",
+  isRecurring: true,
+  recurrence: "WEEKLY",
+  recurrenceDays: ["MON", "TUE", "WED", "THU", "FRI"]
+})
+
+// Test Monday (should appear)
+const mondaySchedules = await getTodaysSchedule(userId, "2024-01-15") // Monday
+expect(mondaySchedules.schedules).toContainEqual(
+  expect.objectContaining({ title: "Weekday Schedule" })
+)
+
+// Test Saturday (should not appear)
+const saturdaySchedules = await getTodaysSchedule(userId, "2024-01-20") // Saturday
+expect(saturdaySchedules.schedules).not.toContainEqual(
+  expect.objectContaining({ title: "Weekday Schedule" })
+)
+```
+
+### Schedule Viewing & Integration
+
+#### Test 9: Employee Schedule Dashboard
+**Objective**: Test real-time schedule viewing on employee dashboard
+
+**Test Steps**:
+1. Create schedule assigned to employee
+2. Login as employee
+3. Verify schedule appears on dashboard
+4. Verify schedule details are correct
+
+```typescript
+// Create schedule for employee
+const schedule = await createSchedule({
+  title: "Employee Shift",
+  userId: employeeId,
+  startTime: "09:00",
+  endTime: "17:00"
+})
+
+// Login as employee and check dashboard
+const dashboardData = await getTodaysSchedule(employeeId)
+expect(dashboardData.schedules).toHaveLength(1)
+expect(dashboardData.schedules[0].title).toBe("Employee Shift")
+```
+
+## Timesheet System Testing
+
+### Timesheet Generation
+
+#### Test 10: Clock Events to Timesheet Conversion
+**Objective**: Test automatic timesheet generation from clock events
+
+**Test Scenario**:
+1. Create clock events for a week
+2. Generate timesheet
+3. Verify calculations are correct
+
+**Test Steps**:
+```typescript
+// Create sample clock events
+const clockEvents = [
+  { type: 'CLOCK_IN', timestamp: '2024-01-15T09:00:00Z' },
+  { type: 'BREAK_START', timestamp: '2024-01-15T12:00:00Z' },
+  { type: 'BREAK_END', timestamp: '2024-01-15T12:30:00Z' },
+  { type: 'CLOCK_OUT', timestamp: '2024-01-15T17:00:00Z' }
+]
+
+// Generate timesheet
+const timesheet = await generateTimesheetFromClockEvents(
+  userId,
+  new Date('2024-01-15'),
+  new Date('2024-01-19')
+)
+
+// Verify calculations
+expect(timesheet.totalHours).toBe(7.5) // 8 hours - 0.5 hour break
+expect(timesheet.regularHours).toBe(7.5)
+expect(timesheet.overtimeHours).toBe(0)
+expect(timesheet.breakHours).toBe(0.5)
+```
+
+#### Test 11: Overtime Calculation
+**Objective**: Test overtime calculation (>8 hours per day)
+
+**Test Steps**:
+```typescript
+// Create long work day (10 hours)
+const longDayEvents = [
+  { type: 'CLOCK_IN', timestamp: '2024-01-15T08:00:00Z' },
+  { type: 'CLOCK_OUT', timestamp: '2024-01-15T18:00:00Z' }
+]
+
+const overtimeTimesheet = await generateTimesheetFromClockEvents(
+  userId,
+  new Date('2024-01-15'),
+  new Date('2024-01-15')
+)
+
+expect(overtimeTimesheet.totalHours).toBe(10)
+expect(overtimeTimesheet.regularHours).toBe(8)
+expect(overtimeTimesheet.overtimeHours).toBe(2)
+```
+
+### Weekly Timesheet Overview
+
+#### Test 12: Weekly Hours Breakdown
+**Objective**: Test weekly timesheet with daily breakdown
+
+**Test Steps**:
+```typescript
+// Create events for full week
+const weeklyEvents = [
+  // Monday: 8 hours
+  { type: 'CLOCK_IN', timestamp: '2024-01-15T09:00:00Z' },
+  { type: 'CLOCK_OUT', timestamp: '2024-01-15T17:00:00Z' },
+  // Tuesday: 7 hours
+  { type: 'CLOCK_IN', timestamp: '2024-01-16T09:00:00Z' },
+  { type: 'CLOCK_OUT', timestamp: '2024-01-16T16:00:00Z' },
+  // ... more days
+]
+
+const weeklyTimesheet = await getWeeklyTimesheet(
+  userId,
+  new Date('2024-01-15') // Week start
+)
+
+expect(weeklyTimesheet.totalWeekHours).toBe(40)
+expect(weeklyTimesheet.dailyBreakdown).toHaveLength(7)
+expect(weeklyTimesheet.dailyBreakdown[0].hours).toBe(8) // Monday
+expect(weeklyTimesheet.dailyBreakdown[1].hours).toBe(7) // Tuesday
+```
+
+## Team Management Testing
+
+### Team Creation & Management
+
+#### Test 13: Team Creation
+**Objective**: Test team creation with managers and members
+
+**Test Steps**:
+```typescript
+// Create team
+const teamData = {
+  name: "Development Team",
+  description: "Frontend and backend developers",
+  color: "#3B82F6",
+  managerId: "manager-123"
+}
+
+const team = await createTeam(teamData)
+expect(team.success).toBe(true)
+expect(team.team.name).toBe("Development Team")
+expect(team.team.managerId).toBe("manager-123")
+```
+
+#### Test 14: Team Member Management
+**Objective**: Test adding/removing team members
+
+**Test Steps**:
+```typescript
+// Add team members
+const addResult = await addTeamMember(teamId, userId, "MEMBER")
+expect(addResult.success).toBe(true)
+
+// Remove team member
+const removeResult = await removeTeamMember(teamId, userId)
+expect(removeResult.success).toBe(true)
+
+// Verify member list
+const teamMembers = await getTeamMembers(teamId)
+expect(teamMembers.members).not.toContainEqual(
+  expect.objectContaining({ userId })
+)
+```
+
+### Team-Based Scheduling
+
+#### Test 15: Bulk Schedule Assignment
+**Objective**: Test assigning schedules to entire teams
+
+**Test Steps**:
+```typescript
+// Create team with multiple members
+const team = await createTeam({
+  name: "Test Team",
+  managerId: "manager-123"
+})
+
+await addTeamMember(team.id, "employee-1", "MEMBER")
+await addTeamMember(team.id, "employee-2", "MEMBER")
+
+// Create schedule assigned to team
+const teamSchedule = await createSchedule({
+  title: "Team Schedule",
+  teamId: team.id,
+  startTime: "09:00",
+  endTime: "17:00"
+})
+
+// Verify all team members see the schedule
+const employee1Schedules = await getTodaysSchedule("employee-1")
+const employee2Schedules = await getTodaysSchedule("employee-2")
+
+expect(employee1Schedules.schedules).toContainEqual(
+  expect.objectContaining({ title: "Team Schedule" })
+)
+expect(employee2Schedules.schedules).toContainEqual(
+  expect.objectContaining({ title: "Team Schedule" })
+)
+```
+
 ## Real-Time Features Testing
 
-### Test 6: Component Synchronization
+### Test 16: Component Synchronization
 **Objective**: Verify real-time updates between dashboard components
 
 **Test Steps**:
@@ -199,374 +511,294 @@ expect(finalHours).toBe(7.5)
 **Manual Testing**:
 ```javascript
 // Browser console testing
-// 1. Clock in and watch for automatic updates
-await clockIn({ method: 'MANUAL' })
-
-// 2. Verify recent activity refreshes without page reload
-// Check that new clock event appears in recent activity
-
-// 3. Verify status indicator updates
-// Check that status changes from "Clocked Out" to "Clocked In"
-```
-
-### Test 7: Cache Invalidation Strategy
-**Objective**: Test that cache invalidation affects correct user groups
-
-**Test Scenario**:
-- Employee A clocks in
-- Employee B (same org) should not get cache invalidated
-- Manager should get cache invalidated (team view needs update)
-
-**Test Steps**:
-```typescript
-// Employee A clocks in
-const employeeA = await signIn('employeeA@acme-corp.com', 'password')
-await clockIn({ method: 'MANUAL' })
-
-// Verify manager cache is invalidated (team view updates)
-const manager = await signIn('manager@acme-corp.com', 'password')
-const teamStatus = await getTeamStatus()
-// Should show Employee A as clocked in
-
-// Verify other employees don't get unnecessary cache invalidation
-const employeeB = await signIn('employeeB@acme-corp.com', 'password')
-// Employee B's dashboard should not auto-refresh
-```
-
-## API Testing
-
-### Server Actions Testing
-
-#### Test 8: Server Action Error Handling
-**Objective**: Test server action error responses and validation
-
-**Test Steps**:
-```typescript
-// Test authentication requirement
-const unauthenticatedResult = await clockIn({ method: 'MANUAL' })
-expect(unauthenticatedResult.success).toBe(false)
-expect(unauthenticatedResult.error).toContain('Authentication required')
-
-// Test invalid parameters
-const invalidResult = await clockIn({
-  method: 'GEOFENCE',
-  latitude: 999, // Invalid latitude
-  longitude: 999  // Invalid longitude
+// 1. Open dashboard
+// 2. Execute clock-in
+await fetch('/api/clock', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ action: 'CLOCK_IN', method: 'MANUAL' })
 })
-expect(invalidResult.success).toBe(false)
-expect(invalidResult.error).toContain('Invalid')
+
+// 3. Verify components update automatically
+// - Recent activity should show new clock-in event
+// - Status should change to "CLOCKED_IN"
+// - Hours calculation should start
 ```
 
-### API Routes Testing
-
-#### Test 9: API Endpoint Consistency
-**Objective**: Verify API routes return consistent data with server actions
+### Test 17: Manager Dashboard Real-Time Updates
+**Objective**: Test live team status updates
 
 **Test Steps**:
 ```typescript
-// Compare server action vs API route results
-const serverActionResult = await getCurrentStatus()
-const apiResult = await fetch('/api/clock').then(r => r.json())
+// Manager views team dashboard
+const initialTeamStatus = await getTeamStatus()
+expect(initialTeamStatus.currentlyWorking).toBe(0)
 
-expect(serverActionResult.currentStatus).toBe(apiResult.currentStatus)
-expect(serverActionResult.todaysHours).toBe(apiResult.todaysHours)
+// Employee clocks in
+await clockIn({ userId: "employee-1", method: "MANUAL" })
+
+// Manager dashboard should reflect change
+const updatedTeamStatus = await getTeamStatus()
+expect(updatedTeamStatus.currentlyWorking).toBe(1)
+```
+
+## Integration Testing
+
+### Test 18: End-to-End Employee Workflow
+**Objective**: Test complete employee experience
+
+**Workflow Steps**:
+1. Employee logs in
+2. Views today's schedule
+3. Clocks in
+4. Takes break
+5. Ends break
+6. Clocks out
+7. Generates timesheet
+8. Views timesheet history
+
+**Test Implementation**:
+```typescript
+// Complete workflow test
+const employeeWorkflow = async () => {
+  // 1. Login
+  const session = await signIn('employee@company.com', 'password')
+  
+  // 2. View schedule
+  const schedule = await getTodaysSchedule(session.user.id)
+  expect(schedule.schedules).toHaveLength(1)
+  
+  // 3. Clock in
+  const clockInResult = await clockIn({ method: 'MANUAL' })
+  expect(clockInResult.success).toBe(true)
+  
+  // 4. Take break
+  const breakStart = await startBreak()
+  expect(breakStart.success).toBe(true)
+  
+  // 5. End break
+  const breakEnd = await endBreak()
+  expect(breakEnd.success).toBe(true)
+  
+  // 6. Clock out
+  const clockOutResult = await clockOut()
+  expect(clockOutResult.success).toBe(true)
+  
+  // 7. Generate timesheet
+  const timesheet = await generateTimesheetFromClockEvents(
+    session.user.id,
+    new Date(),
+    new Date()
+  )
+  expect(timesheet.success).toBe(true)
+  
+  // 8. View history
+  const history = await getEmployeeTimesheets(session.user.id)
+  expect(history.timesheets).toHaveLength(1)
+}
+```
+
+### Test 19: Manager Complete Workflow
+**Objective**: Test complete manager experience
+
+**Workflow Steps**:
+1. Manager logs in
+2. Views team dashboard
+3. Creates new schedule
+4. Assigns schedule to team
+5. Approves timesheet
+6. Views team analytics
+
+**Test Implementation**:
+```typescript
+const managerWorkflow = async () => {
+  // 1. Login as manager
+  const session = await signIn('manager@company.com', 'password')
+  
+  // 2. View team dashboard
+  const teamStatus = await getTeamStatus()
+  expect(teamStatus.success).toBe(true)
+  
+  // 3. Create schedule
+  const schedule = await createSchedule({
+    title: "New Team Schedule",
+    teamId: "team-123",
+    startTime: "09:00",
+    endTime: "17:00"
+  })
+  expect(schedule.success).toBe(true)
+  
+  // 4. Schedule automatically assigned to team
+  const teamSchedules = await getTeamSchedules("team-123")
+  expect(teamSchedules.schedules).toContainEqual(
+    expect.objectContaining({ title: "New Team Schedule" })
+  )
+  
+  // 5. Approve timesheet
+  const approval = await approveTimesheet("timesheet-123")
+  expect(approval.success).toBe(true)
+  
+  // 6. View analytics
+  const analytics = await getTeamAnalytics("team-123")
+  expect(analytics.success).toBe(true)
+}
 ```
 
 ## Performance Testing
 
-### Test 10: Database Query Optimization
-**Objective**: Ensure queries are efficient and properly indexed
+### Test 20: Database Query Performance
+**Objective**: Ensure efficient database queries
 
-**Test Steps**:
-```sql
--- Test query performance
-EXPLAIN ANALYZE SELECT * FROM "ClockEvent" 
-WHERE "organizationId" = 'org_123' 
-AND "userId" = 'user_456' 
-AND "timestamp" >= '2024-01-15T00:00:00Z' 
-AND "timestamp" <= '2024-01-15T23:59:59Z'
-ORDER BY "timestamp" ASC;
+**Test Scenarios**:
+```typescript
+// Test complex schedule query performance
+const startTime = Date.now()
+const schedules = await getTodaysSchedule(userId)
+const queryTime = Date.now() - startTime
 
--- Should use indexes and complete in <10ms
-```
+expect(queryTime).toBeLessThan(500) // Should complete in <500ms
 
-### Test 11: Real-Time Update Performance
-**Objective**: Test performance with multiple concurrent users
-
-**Load Testing**:
-```javascript
-// Simulate 10 concurrent users clocking in
-const promises = Array.from({ length: 10 }, (_, i) => 
-  clockIn({ 
-    method: 'MANUAL',
-    userId: `user_${i}`,
-    organizationId: 'test_org'
-  })
+// Test timesheet generation performance
+const timesheetStartTime = Date.now()
+const timesheet = await generateTimesheetFromClockEvents(
+  userId,
+  new Date('2024-01-01'),
+  new Date('2024-01-31')
 )
+const timesheetTime = Date.now() - timesheetStartTime
 
-const results = await Promise.all(promises)
-const successCount = results.filter(r => r.success).length
-expect(successCount).toBe(10) // All should succeed
+expect(timesheetTime).toBeLessThan(1000) // Should complete in <1s
 ```
 
 ## Security Testing
 
-### Test 12: Input Validation
-**Objective**: Test all input validation and sanitization
-
-**Test Cases**:
-```typescript
-// SQL injection attempts
-const maliciousInput = "'; DROP TABLE ClockEvent; --"
-const result = await clockIn({ 
-  method: 'MANUAL',
-  notes: maliciousInput 
-})
-expect(result.success).toBe(true) // Should be safely handled
-
-// XSS attempts
-const xssInput = "<script>alert('xss')</script>"
-const xssResult = await clockIn({ 
-  method: 'MANUAL',
-  notes: xssInput 
-})
-// Should be sanitized in database
-```
-
-### Test 13: Organization Boundary Security
-**Objective**: Attempt to access data across organization boundaries
+### Test 21: Organization Data Isolation
+**Objective**: Verify no data leakage between organizations
 
 **Test Steps**:
 ```typescript
-// Try to access another organization's data
-const orgAUser = await signIn('user@acme-corp.com', 'password')
-
-// Attempt to access org B's clock events directly
-const unauthorizedAccess = await prisma.clockEvent.findMany({
-  where: { organizationId: 'org_b_id' } // Different org
+// Create data in Organization A
+const orgAUser = await signIn('user@org-a.com', 'password')
+const orgASchedule = await createSchedule({
+  title: "Org A Schedule",
+  userId: orgAUser.id
 })
 
-// Should be prevented by application logic
-expect(unauthorizedAccess).toHaveLength(0)
+// Try to access from Organization B
+const orgBUser = await signIn('user@org-b.com', 'password')
+const orgBSchedules = await getTodaysSchedule(orgBUser.id)
+
+// Verify Organization B cannot see Organization A's schedule
+expect(orgBSchedules.schedules).not.toContainEqual(
+  expect.objectContaining({ title: "Org A Schedule" })
+)
 ```
 
-## Mobile Testing
-
-### Test 14: Mobile GPS Functionality
-**Objective**: Test GPS features on mobile devices
-
-**Test Devices**:
-- iOS Safari
-- Android Chrome
-- Mobile Firefox
+### Test 22: Role-Based Access Control
+**Objective**: Test permission enforcement
 
 **Test Steps**:
-1. Open SmartClock on mobile browser
-2. Allow location permissions
-3. Test GPS accuracy and speed
-4. Test clock-in with GPS
-5. Verify touch interactions work properly
-
-**Expected Results**:
-- GPS permission request appears
-- Location accuracy within 10 meters
-- Clock-in completes successfully
-- UI is touch-friendly and responsive
-
-### Test 15: Mobile Performance
-**Objective**: Test performance on mobile devices
-
-**Metrics to Test**:
-- Page load time < 3 seconds
-- GPS lock time < 30 seconds
-- Clock action response < 2 seconds
-- Smooth scrolling and animations
-
-## Integration Testing
-
-### Test 16: End-to-End User Workflows
-
-#### Complete Employee Day Workflow
 ```typescript
-describe('Complete Employee Day', () => {
-  test('Full day workflow', async () => {
-    // 1. Employee logs in
-    await signIn('employee@acme-corp.com', 'password')
-    
-    // 2. Clock in with GPS
-    const clockInResult = await clockIn({
-      method: 'GEOFENCE',
-      latitude: 43.90973166684534,
-      longitude: -78.83681245557024
-    })
-    expect(clockInResult.success).toBe(true)
-    
-    // 3. Take a break
-    const breakStart = await startBreak({ method: 'MANUAL' })
-    expect(breakStart.success).toBe(true)
-    
-    // 4. End break
-    const breakEnd = await endBreak({ method: 'MANUAL' })
-    expect(breakEnd.success).toBe(true)
-    
-    // 5. Clock out
-    const clockOut = await clockOut({ method: 'MANUAL' })
-    expect(clockOut.success).toBe(true)
-    
-    // 6. Verify final hours calculation
-    const status = await getCurrentStatus()
-    expect(status.todaysHours).toBeGreaterThan(0)
-  })
-})
-```
+// Employee tries to access manager functions
+const employee = await signIn('employee@company.com', 'password')
+const teamAccess = await getTeamStatus()
+expect(teamAccess.success).toBe(false)
+expect(teamAccess.error).toContain('Insufficient permissions')
 
-#### Manager Oversight Workflow
-```typescript
-describe('Manager Oversight', () => {
-  test('Manager can monitor team', async () => {
-    // 1. Manager logs in
-    await signIn('manager@acme-corp.com', 'password')
-    
-    // 2. View team status
-    const teamStatus = await getTeamStatus()
-    expect(teamStatus.success).toBe(true)
-    expect(teamStatus.teamMembers.length).toBeGreaterThan(0)
-    
-    // 3. View team activity
-    const teamActivity = await getTeamActivity()
-    expect(teamActivity.success).toBe(true)
-    
-    // 4. Verify real-time updates when employee clocks in
-    // (This would require WebSocket testing or polling)
-  })
-})
+// Manager can access team functions
+const manager = await signIn('manager@company.com', 'password')
+const managerTeamAccess = await getTeamStatus()
+expect(managerTeamAccess.success).toBe(true)
 ```
 
 ## Automated Testing Setup
 
-### Unit Tests
-```bash
-# Run unit tests
-npm test
+### Jest Configuration
 
-# Run with coverage
-npm run test:coverage
-```
-
-### Integration Tests
-```bash
-# Run integration tests
-npm run test:integration
-
-# Run specific test suite
-npm run test -- --grep "Clock functionality"
-```
-
-### E2E Tests (Planned)
-```bash
-# Run end-to-end tests with Playwright
-npm run test:e2e
-
-# Run specific browser
-npm run test:e2e -- --project=chromium
-```
-
-## Test Data Management
-
-### Seeded Test Data
-
-The database seed includes:
-- 3 test organizations
-- 10+ test users with different roles
-- Multiple locations with GPS coordinates
-- Sample clock events for testing
-
-### Test Data Reset
-```bash
-# Reset test database
-npx prisma db push --force-reset
-npx prisma db seed
-```
-
-### Custom Test Data
-```typescript
-// Create custom test scenarios
-async function createTestScenario() {
-  const org = await prisma.organization.create({
-    data: {
-      name: 'Test Organization',
-      slug: 'test-org',
-      planType: 'PROFESSIONAL'
-    }
-  })
-  
-  const user = await prisma.user.create({
-    data: {
-      email: 'test@test-org.com',
-      name: 'Test User',
-      organizationId: org.id,
-      role: 'EMPLOYEE'
-    }
-  })
-  
-  return { org, user }
+```javascript
+// jest.config.js
+module.exports = {
+  testEnvironment: 'node',
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  testMatch: ['**/__tests__/**/*.test.js'],
+  collectCoverageFrom: [
+    'actions/**/*.ts',
+    'app/api/**/*.ts',
+    '!**/*.d.ts'
+  ]
 }
 ```
 
-## Continuous Testing
+### Test Database Setup
 
-### GitHub Actions (Planned)
-```yaml
-# .github/workflows/test.yml
-name: Test Suite
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
-      - run: npm install
-      - run: npm run test
-      - run: npm run test:integration
-```
+```javascript
+// tests/setup.js
+import { PrismaClient } from '@prisma/client'
 
-### Pre-commit Hooks
-```bash
-# Install pre-commit hooks
-npm install --save-dev husky lint-staged
-
-# Add to package.json
-{
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged"
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.TEST_DATABASE_URL
     }
-  },
-  "lint-staged": {
-    "*.{ts,tsx}": ["npm run test:related", "npm run lint"]
   }
-}
+})
+
+beforeEach(async () => {
+  // Clean database before each test
+  await prisma.clockEvent.deleteMany()
+  await prisma.schedule.deleteMany()
+  await prisma.timesheet.deleteMany()
+  await prisma.teamMember.deleteMany()
+  await prisma.team.deleteMany()
+  await prisma.user.deleteMany()
+  await prisma.organization.deleteMany()
+})
+
+afterAll(async () => {
+  await prisma.$disconnect()
+})
 ```
 
 ## Testing Checklist
 
-### Before Each Release
-- [ ] All unit tests pass
-- [ ] Integration tests pass
-- [ ] Multi-tenant isolation verified
-- [ ] GPS functionality tested on multiple devices
-- [ ] Performance benchmarks met
-- [ ] Security tests pass
-- [ ] Mobile compatibility verified
-- [ ] Cross-browser testing completed
+### Core Features ✅
+- [ ] Multi-tenant data isolation
+- [ ] GPS-based clock in/out
+- [ ] Break management
+- [ ] Real-time dashboard updates
+- [ ] Role-based access control
 
-### Production Deployment Testing
-- [ ] Smoke tests on production environment
-- [ ] Database migrations successful
-- [ ] Environment variables configured
-- [ ] SSL certificates valid
-- [ ] CDN and caching working
-- [ ] Monitoring and alerts active
+### Schedule Management ✅
+- [ ] Schedule creation wizard
+- [ ] Multiple assignment types
+- [ ] Recurring schedule logic
+- [ ] Employee schedule viewing
+- [ ] Schedule approval workflow
 
-This comprehensive testing guide ensures SmartClock maintains high quality and reliability across all features and use cases. 
+### Timesheet System ✅
+- [ ] Clock events to timesheet conversion
+- [ ] Overtime calculation
+- [ ] Weekly timesheet breakdown
+- [ ] Timesheet history
+- [ ] Export functionality
+
+### Team Management ✅
+- [ ] Team creation and management
+- [ ] Team member management
+- [ ] Bulk schedule assignment
+- [ ] Team-based scheduling
+- [ ] Team analytics
+
+### Integration Testing ✅
+- [ ] End-to-end employee workflow
+- [ ] Complete manager workflow
+- [ ] Component synchronization
+- [ ] Real-time updates
+
+### Performance & Security ✅
+- [ ] Database query performance
+- [ ] Organization data isolation
+- [ ] Permission enforcement
+- [ ] Input validation
+
+This comprehensive testing guide ensures all features of SmartClock are thoroughly tested and working correctly across all user roles and scenarios. 

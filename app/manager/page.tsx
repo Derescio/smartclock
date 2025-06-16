@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Providers from "../components/providers"
 import Navigation from "../components/navigation"
-import TeamStatusServer from "./components/team-status-server"
 import TeamStatsServer from "./components/team-stats-server"
 import RecentTeamActivityServer from "./components/recent-team-activity-server"
 import type { SessionUser } from "@/types"
@@ -47,19 +46,14 @@ export default async function ManagerDashboard() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Left Column - Team Stats */}
                         <div className="lg:col-span-1">
                             <TeamStatsServer />
                         </div>
 
-                        {/* Middle Column - Team Status */}
+                        {/* Right Column - Recent Activity (now spans 2 columns) */}
                         <div className="lg:col-span-2">
-                            <TeamStatusServer />
-                        </div>
-
-                        {/* Right Column - Recent Activity */}
-                        <div className="lg:col-span-1">
                             <RecentTeamActivityServer />
                         </div>
                     </div>
@@ -82,9 +76,16 @@ export default async function ManagerDashboard() {
                                         Add New Employee
                                     </Button>
                                 </Link>
-                                <Button variant="outline" className="w-full">
-                                    Manage Schedules
-                                </Button>
+                                <Link href="/manager/schedules">
+                                    <Button variant="outline" className="w-full">
+                                        Manage Schedules
+                                    </Button>
+                                </Link>
+                                <Link href="/manager/teams">
+                                    <Button variant="outline" className="w-full">
+                                        Manage Teams
+                                    </Button>
+                                </Link>
                             </CardContent>
                         </Card>
 
@@ -96,10 +97,14 @@ export default async function ManagerDashboard() {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                <Button className="w-full btn-secondary">View Locations</Button>
-                                <Button variant="outline" className="w-full">
-                                    Add New Location
-                                </Button>
+                                <Link href="/manager/locations">
+                                    <Button className="w-full btn-secondary">View Locations</Button>
+                                </Link>
+                                <Link href="/manager/locations/add">
+                                    <Button variant="outline" className="w-full">
+                                        Add New Location
+                                    </Button>
+                                </Link>
                                 <Button variant="outline" className="w-full">
                                     Update Geofences
                                 </Button>

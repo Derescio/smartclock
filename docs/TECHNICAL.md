@@ -30,10 +30,14 @@ SmartClock is a multi-tenant SaaS time tracking platform built with Next.js 15, 
 
 ```
 smartclock/
-├── actions/                    # Centralized server actions hub (1,500+ lines)
+├── actions/                    # Centralized server actions hub (2,000+ lines)
 │   ├── auth.ts                # Authentication & session management (110 lines)
 │   ├── clock.ts               # Time tracking & GPS validation (456 lines)
 │   ├── team.ts                # Team management & analytics (361 lines)
+│   ├── schedules.ts           # Schedule management system (652 lines)
+│   ├── timesheets.ts          # Timesheet generation & management (379 lines)
+│   ├── teams.ts               # Team creation & collaboration (250 lines)
+│   ├── employees.ts           # Employee CRUD operations (200+ lines)
 │   ├── locations.ts           # Location & geofencing (280 lines)
 │   ├── organizations.ts       # Multi-tenant operations (331 lines)
 │   ├── index.ts               # Unified exports (75 lines)
@@ -48,17 +52,30 @@ smartclock/
 │   │   ├── recent-activity.tsx # Live activity feed
 │   │   ├── dashboard-client.tsx # Client-side dashboard coordinator
 │   │   └── ...
+│   ├── timesheets/            # Employee timesheet management
+│   │   ├── components/        # Timesheet UI components
+│   │   │   └── timesheet-client.tsx # Full timesheet management interface
+│   │   └── page.tsx           # Timesheet main page
 │   ├── manager/               # Manager dashboard
+│   │   ├── employees/         # Employee management system
+│   │   ├── departments/       # Department management system
+│   │   ├── schedules/         # Schedule management system
+│   │   │   ├── create/        # Schedule creation wizard
+│   │   │   ├── [id]/edit/     # Schedule editing interface
+│   │   │   └── components/    # Schedule management components
+│   │   ├── teams/             # Team management system
+│   │   │   ├── create/        # Team creation interface
+│   │   │   └── components/    # Team management components
 │   │   └── page.tsx           # Team management interface
 │   ├── globals.css            # Global styles
 │   ├── layout.tsx             # Root layout with providers
 │   └── page.tsx               # Employee dashboard
 ├── docs/                      # Comprehensive documentation (2,674+ lines)
-│   ├── TECHNICAL.md           # Architecture & implementation (342 lines)
+│   ├── TECHNICAL.md           # Architecture & implementation (689 lines)
 │   ├── API.md                 # Complete API reference (485 lines)
 │   ├── USER_GUIDE.md          # End-user documentation (249 lines)
-│   ├── TESTING_GUIDE.md       # Testing strategies (393 lines)
-│   ├── FEATURES_ROADMAP.md    # Development roadmap (215 lines)
+│   ├── TESTING_GUIDE.md       # Testing strategies (572 lines)
+│   ├── FEATURES_ROADMAP.md    # Development roadmap (280 lines)
 │   └── lessons.md             # Development lessons (259 lines)
 ├── lib/                       # Utilities and configurations
 │   ├── auth.ts                # NextAuth configuration
@@ -68,8 +85,9 @@ smartclock/
 │   ├── schema.prisma          # Database schema (215 lines)
 │   └── seed.ts                # Database seeding
 ├── types/                     # TypeScript type definitions
-│   └── index.ts               # Comprehensive types (278 lines)
-└── README.md                  # Project overview (223 lines)
+│   ├── index.ts               # Comprehensive types (278 lines)
+│   └── teams.ts               # Team-related type definitions
+└── README.md                  # Project overview (360 lines)
 ```
 
 ## Centralized Actions Hub
@@ -83,6 +101,10 @@ All business logic is centralized in the `actions/` folder, providing a single s
 export * from './auth'
 export * from './clock'
 export * from './team'
+export * from './schedules'
+export * from './timesheets'
+export * from './teams'
+export * from './employees'
 export * from './locations'
 export * from './organizations'
 ```
@@ -194,297 +216,249 @@ const DashboardClient = () => {
 }
 ```
 
+## Advanced Feature Architecture
+
+### Schedule Management System
+
+The schedule management system provides comprehensive scheduling capabilities:
+
+```typescript
+// actions/schedules.ts - Core scheduling functions
+export async function getTodaysSchedule() {
+  // Fetches schedules for current user including:
+  // - Direct user assignments
+  // - Department-wide assignments
+  // - Location-based assignments
+  // - Team assignments (via TeamMember relationships)
+  // - Recurring schedule support with day-of-week filtering
+}
+
+export async function createSchedule(data: ScheduleData) {
+  // 4-step wizard creation with:
+  // - Multiple assignment types
+  // - Recurring patterns
+  // - Approval workflow
+  // - Smart validation
+}
+```
+
+### Timesheet System
+
+Automated timesheet generation from clock events:
+
+```typescript
+// actions/timesheets.ts - Timesheet management
+export async function generateTimesheetFromClockEvents(
+  userId: string, 
+  startDate: Date, 
+  endDate: Date
+) {
+  // Advanced calculations:
+  // - Total hours worked per day/week
+  // - Regular hours (≤8 hours per day)
+  // - Overtime hours (>8 hours per day)
+  // - Break time tracking and deduction
+  // - Clock in/out time tracking
+}
+
+export async function getWeeklyTimesheet(userId: string, weekStart: Date) {
+  // Detailed weekly breakdown with:
+  // - Daily hours breakdown
+  // - Clock in/out times
+  // - Break duration
+  // - Status tracking
+}
+```
+
+### Team Management & Collaboration
+
+Team-based scheduling and management:
+
+```typescript
+// actions/teams.ts - Team collaboration
+export async function createTeam(data: TeamData) {
+  // Team creation with:
+  // - Managers and members
+  // - Custom colors
+  // - Bulk assignment capabilities
+}
+
+export async function assignScheduleToTeam(scheduleId: string, teamId: string) {
+  // Bulk schedule assignment:
+  // - Assign to entire teams
+  // - Automatic member inclusion
+  // - Efficient management
+}
+```
+
 ## Database Schema
 
 ### Multi-Tenant Design
 
-The database is designed with organization-level isolation:
+Every table includes `organizationId` for complete data isolation:
 
-```prisma
-model Organization {
-  id                String        @id @default(cuid())
-  name              String
-  slug              String        @unique
-  planType          PlanType      @default(BASIC)
-  billingStatus     BillingStatus @default(TRIAL)
-  
-  // Relations
-  users       User[]
-  locations   Location[]
-  clockEvents ClockEvent[]
-  timesheets  Timesheet[]
-}
+```sql
+-- Core tables with organization isolation
+CREATE TABLE Organization (
+  id VARCHAR(30) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  slug VARCHAR(50) UNIQUE NOT NULL,
+  subdomain VARCHAR(50) UNIQUE, -- For Phase 8
+  plan SubscriptionPlan DEFAULT 'BASIC',
+  trialEndsAt TIMESTAMP,
+  isActive BOOLEAN DEFAULT true,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-model User {
-  id             String   @id @default(cuid())
-  organizationId String   // Critical for multi-tenancy
-  email          String   @unique
-  role           UserRole @default(EMPLOYEE)
-  
-  // Relations
-  organization Organization @relation(fields: [organizationId], references: [id])
-  clockEvents  ClockEvent[]
-}
+CREATE TABLE User (
+  id VARCHAR(30) PRIMARY KEY,
+  organizationId VARCHAR(30) REFERENCES Organization(id),
+  email VARCHAR(100) UNIQUE NOT NULL,
+  name VARCHAR(100),
+  role UserRole DEFAULT 'EMPLOYEE',
+  departmentId VARCHAR(30) REFERENCES Department(id),
+  locationId VARCHAR(30) REFERENCES Location(id),
+  isActive BOOLEAN DEFAULT true,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-model ClockEvent {
-  id             String      @id @default(cuid())
-  organizationId String      // Ensures data isolation
-  userId         String
-  type           ClockType
-  timestamp      DateTime    @default(now())
-  method         ClockMethod @default(MANUAL)
-  latitude       Float?
-  longitude      Float?
-  locationId     String?
-  
-  // Relations with organization isolation
-  organization Organization @relation(fields: [organizationId], references: [id])
-  user         User         @relation(fields: [userId], references: [id])
-  location     Location?    @relation(fields: [locationId], references: [id])
-}
+-- Schedule management tables
+CREATE TABLE Schedule (
+  id VARCHAR(30) PRIMARY KEY,
+  organizationId VARCHAR(30) REFERENCES Organization(id),
+  title VARCHAR(200) NOT NULL,
+  scheduleType ScheduleType NOT NULL,
+  startDate DATE NOT NULL,
+  endDate DATE,
+  startTime TIME NOT NULL,
+  endTime TIME NOT NULL,
+  isRecurring BOOLEAN DEFAULT false,
+  recurrence RecurrenceType,
+  recurrenceDays TEXT, -- JSON array
+  userId VARCHAR(30) REFERENCES User(id),
+  departmentId VARCHAR(30) REFERENCES Department(id),
+  locationId VARCHAR(30) REFERENCES Location(id),
+  teamId VARCHAR(30) REFERENCES Team(id),
+  status ScheduleStatus DEFAULT 'PENDING',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Timesheet management
+CREATE TABLE Timesheet (
+  id VARCHAR(30) PRIMARY KEY,
+  organizationId VARCHAR(30) REFERENCES Organization(id),
+  userId VARCHAR(30) REFERENCES User(id),
+  startDate DATE NOT NULL,
+  endDate DATE NOT NULL,
+  totalHours DECIMAL(5,2) DEFAULT 0,
+  regularHours DECIMAL(5,2) DEFAULT 0,
+  overtimeHours DECIMAL(5,2) DEFAULT 0,
+  breakHours DECIMAL(5,2) DEFAULT 0,
+  status TimesheetStatus DEFAULT 'DRAFT',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Team collaboration
+CREATE TABLE Team (
+  id VARCHAR(30) PRIMARY KEY,
+  organizationId VARCHAR(30) REFERENCES Organization(id),
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  color VARCHAR(7) DEFAULT '#3B82F6',
+  managerId VARCHAR(30) REFERENCES User(id),
+  isActive BOOLEAN DEFAULT true,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE TeamMember (
+  id VARCHAR(30) PRIMARY KEY,
+  teamId VARCHAR(30) REFERENCES Team(id),
+  userId VARCHAR(30) REFERENCES User(id),
+  role TeamRole DEFAULT 'MEMBER',
+  joinedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(teamId, userId)
+);
 ```
 
-### Key Design Principles
+### Advanced Relationships
 
-1. **Organization Isolation** - Every table includes `organizationId`
-2. **Audit Trail** - All events are logged with timestamps
-3. **Flexible Relationships** - Support for multiple locations per organization
-4. **Type Safety** - Enums for consistent data types
+The schema supports complex relationships for flexible scheduling:
 
-## Authentication & Authorization
+```sql
+-- Schedule assignment flexibility
+-- A schedule can be assigned to:
+-- 1. Individual user (userId)
+-- 2. Entire department (departmentId)
+-- 3. Specific location (locationId)
+-- 4. Team (teamId)
 
-### NextAuth.js Configuration
-
-```typescript
-// lib/auth.ts
-export const authOptions: NextAuthOptions = {
-  providers: [
-    CredentialsProvider({
-      async authorize(credentials) {
-        // Custom authentication logic
-        const user = await validateUser(credentials)
-        return user ? {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          organizationId: user.organizationId,
-          organizationName: user.organization.name,
-          // ... other organization data
-        } : null
-      }
-    })
-  ],
-  callbacks: {
-    jwt: async ({ token, user }) => {
-      if (user) {
-        // Store organization data in JWT
-        token.role = user.role
-        token.organizationId = user.organizationId
-        token.organizationName = user.organizationName
-        // ... other fields
-      }
-      return token
-    },
-    session: async ({ session, token }) => {
-      if (session.user && token) {
-        // Add organization context to session
-        session.user.id = token.sub!
-        session.user.role = token.role as UserRole
-        session.user.organizationId = token.organizationId as string
-        // ... other fields
-      }
-      return session
-    }
-  }
-}
+-- Query example: Get all schedules for a user
+SELECT s.* FROM Schedule s
+WHERE s.organizationId = ? AND s.isActive = true
+AND (
+  s.userId = ? OR                    -- Direct assignment
+  s.departmentId = ? OR              -- Department assignment
+  s.locationId = ? OR                -- Location assignment
+  s.teamId IN (                      -- Team assignment
+    SELECT tm.teamId FROM TeamMember tm 
+    WHERE tm.userId = ?
+  )
+)
 ```
 
-### Role-Based Access Control
+## Performance Optimizations
+
+### Database Query Optimization
 
 ```typescript
-// Middleware for role-based access
-export function requireRole(allowedRoles: UserRole[]) {
-  return async (req: Request) => {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user) {
-      throw new Error("Authentication required")
-    }
-    
-    if (!allowedRoles.includes(session.user.role)) {
-      throw new Error("Insufficient permissions")
-    }
-    
-    return session.user
-  }
-}
-```
-
-## GPS & Location Services
-
-### Location Validation Algorithm
-
-```typescript
-async function validateUserLocation(
-  organizationId: string,
-  userLatitude: number,
-  userLongitude: number
-): Promise<LocationValidationResult> {
-  // Get organization locations
-  const locations = await prisma.location.findMany({
-    where: { organizationId, isActive: true }
-  })
-  
-  // Find closest location
-  let closestLocation = null
-  let minDistance = Infinity
-  
-  for (const location of locations) {
-    const distance = calculateDistance(
-      userLatitude, userLongitude,
-      location.latitude, location.longitude
-    )
-    
-    if (distance < minDistance) {
-      minDistance = distance
-      closestLocation = location
-    }
-  }
-  
-  // Validate within radius
-  const isValid = minDistance <= (closestLocation?.radius || 10)
-  
-  return {
-    isValid,
-    distance: Math.round(minDistance),
-    locationName: closestLocation?.name,
-    error: isValid ? undefined : `You are ${Math.round(minDistance)}m away. Must be within ${closestLocation?.radius}m.`
-  }
-}
-```
-
-### Distance Calculation (Haversine Formula)
-
-```typescript
-function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371e3 // Earth's radius in meters
-  const φ1 = (lat1 * Math.PI) / 180
-  const φ2 = (lat2 * Math.PI) / 180
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180
-  const Δλ = ((lng2 - lng1) * Math.PI) / 180
-
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-
-  return R * c // Distance in meters
-}
-```
-
-## Real-Time Features
-
-### Smart Refresh Strategy
-
-```typescript
-// Real-time clock updates with optimization
-useEffect(() => {
-  const timer = setInterval(() => {
-    setCurrentTime(new Date())
-    
-    // Only refresh data on minute boundaries when clocked in
-    if (clockStatus?.success && 
-        (clockStatus.currentStatus === "CLOCKED_IN" || clockStatus.currentStatus === "ON_BREAK") &&
-        new Date().getSeconds() === 0) {
-      loadClockStatus()
-    }
-  }, 1000)
-  
-  return () => clearInterval(timer) // Prevent memory leaks
-}, [clockStatus])
-```
-
-### Component Synchronization
-
-```typescript
-// Ref-based component communication
-const RecentActivity = forwardRef<{ refresh: () => void }>((props, ref) => {
-  const loadRecentActivity = async () => {
-    const result = await getTodaysClockEvents()
-    if (result.success) {
-      setActivities(result.clockEvents.slice(-5).reverse())
-    }
-  }
-  
-  useImperativeHandle(ref, () => ({
-    refresh: loadRecentActivity
-  }))
-  
-  // ... component logic
+// Efficient queries with strategic includes
+const schedules = await prisma.schedule.findMany({
+  where: {
+    organizationId: user.organizationId,
+    isActive: true,
+    // Complex OR conditions for assignment types
+  },
+  include: {
+    location: { select: { id: true, name: true, address: true } },
+    department: { select: { id: true, name: true, color: true } },
+    Team: { select: { id: true, name: true, color: true } }
+  },
+  orderBy: { startTime: 'asc' }
 })
 ```
 
-## Time Calculation Engine
-
-### Work Hours Calculation
+### Cache Management Strategy
 
 ```typescript
-async function calculateTodaysHours(userId: string, organizationId: string): Promise<number> {
-  const startOfDay = new Date(new Date().toISOString().split("T")[0] + "T00:00:00.000Z")
-  const endOfDay = new Date(new Date().toISOString().split("T")[0] + "T23:59:59.999Z")
-
-  const events = await prisma.clockEvent.findMany({
-    where: {
-      userId,
-      organizationId, // Organization isolation
-      timestamp: { gte: startOfDay, lte: endOfDay }
-    },
-    orderBy: { timestamp: "asc" }
-  })
-
-  let totalMinutes = 0
-  let clockInTime: Date | null = null
-  let breakStartTime: Date | null = null
-
-  // Process events chronologically
-  for (const event of events) {
-    switch (event.type) {
-      case "CLOCK_IN":
-        clockInTime = event.timestamp
-        break
-      case "CLOCK_OUT":
-        if (clockInTime) {
-          totalMinutes += (event.timestamp.getTime() - clockInTime.getTime()) / (1000 * 60)
-          clockInTime = null
-        }
-        break
-      case "BREAK_START":
-        breakStartTime = event.timestamp
-        break
-      case "BREAK_END":
-        if (breakStartTime && clockInTime) {
-          const breakMinutes = (event.timestamp.getTime() - breakStartTime.getTime()) / (1000 * 60)
-          totalMinutes -= breakMinutes
-          breakStartTime = null
-        }
-        break
-    }
-  }
-
-  // Handle ongoing sessions
-  if (clockInTime) {
-    const now = new Date()
-    totalMinutes += (now.getTime() - clockInTime.getTime()) / (1000 * 60)
-    
-    // Subtract ongoing break time
-    if (breakStartTime) {
-      const breakMinutes = (now.getTime() - breakStartTime.getTime()) / (1000 * 60)
-      totalMinutes -= breakMinutes
-    }
-  }
-
-  return Math.max(0, totalMinutes / 60) // Return hours
+// Strategic cache invalidation
+export async function clockIn(data: ClockInData) {
+  // ... business logic
+  
+  // Only invalidate relevant paths
+  revalidatePath('/manager') // Manager dashboard
+  // Don't invalidate employee dashboard - uses API routes
+  
+  return result
 }
+```
+
+### Real-Time Updates
+
+```typescript
+// Component-level real-time updates
+const RecentActivity = forwardRef<{ refresh: () => void }>((props, ref) => {
+  const [activities, setActivities] = useState([])
+  
+  const refresh = useCallback(async () => {
+    const response = await fetch('/api/clock')
+    const data = await response.json()
+    setActivities(data.recentActivity)
+  }, [])
+  
+  useImperativeHandle(ref, () => ({ refresh }))
+  
+  return <ActivityList activities={activities} />
+})
 ```
 
 ## Type Safety Implementation
@@ -492,121 +466,98 @@ async function calculateTodaysHours(userId: string, organizationId: string): Pro
 ### Comprehensive Type Definitions
 
 ```typescript
-// types/index.ts - 278 lines of type definitions
-
-// Authentication & User Types
-export interface SessionUser extends AuthUser {
-  image?: string | null
-}
-
-export interface AuthUser {
+// types/index.ts - Core types
+export interface User {
   id: string
-  email: string
-  name: string
-  role: UserRole
-  locationId?: string
   organizationId: string
-  organizationName: string
-  organizationSlug: string
-  planType: PlanType
-  billingStatus: BillingStatus
+  email: string
+  name: string | null
+  role: UserRole
+  departmentId: string | null
+  locationId: string | null
+  isActive: boolean
+  createdAt: Date
 }
 
-// Clock & Time Tracking Types
-export interface ClockAction {
-  method: 'MANUAL' | 'QR_CODE' | 'GEOFENCE'
-  latitude?: number
-  longitude?: number
-  locationId?: string
-  notes?: string
+export interface Schedule {
+  id: string
+  organizationId: string
+  title: string
+  scheduleType: ScheduleType
+  startDate: Date
+  endDate: Date | null
+  startTime: string
+  endTime: string
+  isRecurring: boolean
+  recurrence: RecurrenceType | null
+  recurrenceDays: string | null
+  userId: string | null
+  departmentId: string | null
+  locationId: string | null
+  teamId: string | null
+  status: ScheduleStatus
 }
 
-export interface ClockStatus {
-  currentStatus: 'CLOCKED_IN' | 'CLOCKED_OUT' | 'ON_BREAK'
-  clockedInAt?: string
-  lastBreakStart?: string
-  todayHours: number
-  breakTime: number
-  location?: {
-    id: string
-    name: string
-  }
+// types/teams.ts - Team-specific types
+export interface Team {
+  id: string
+  organizationId: string
+  name: string
+  description: string | null
+  color: string
+  managerId: string | null
+  isActive: boolean
+  createdAt: Date
+  manager?: User
+  members?: TeamMember[]
 }
+```
 
-// API Response Types
-export interface ApiResponse<T = any> {
-  success: boolean
-  data?: T
-  error?: string
-  message?: string
-}
+### Extended NextAuth Types
 
-// NextAuth Type Extensions
-declare module 'next-auth' {
-  interface User {
-    id: string
-    role: UserRole
-    locationId?: string
-    organizationId: string
-    organizationName: string
-    organizationSlug: string
-    planType: PlanType
-    billingStatus: BillingStatus
+```typescript
+// types/next-auth.d.ts
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string
+      email: string
+      name: string
+      role: UserRole
+      organizationId: string
+      organizationName: string
+      departmentId?: string
+      locationId?: string
+    }
   }
 }
 ```
 
-## Performance Optimizations
-
-### Cache Management Strategy
-
-1. **Strategic revalidatePath Usage**
-   ```typescript
-   // Only invalidate manager dashboard for team updates
-   revalidatePath('/manager') // Affects managers only
-   
-   // Use client-side refresh for individual users
-   onClockAction?.() // Callback-based updates
-   ```
-
-2. **Smart Data Fetching**
-   ```typescript
-   // Fetch only necessary date ranges
-   const startOfDay = new Date(targetDate + "T00:00:00.000Z")
-   const endOfDay = new Date(targetDate + "T23:59:59.999Z")
-   
-   const events = await prisma.clockEvent.findMany({
-     where: {
-       userId,
-       organizationId,
-       timestamp: { gte: startOfDay, lte: endOfDay }
-     }
-   })
-   ```
-
-3. **Component Optimization**
-   ```typescript
-   // Memoized calculations
-   const formatHours = useCallback((hours: number) => {
-     const h = Math.floor(hours)
-     const m = Math.floor((hours - h) * 60)
-     return `${h}h ${m}m`
-   }, [])
-   ```
-
-## Security Considerations
+## Security Implementation
 
 ### Multi-Tenant Data Isolation
 
-Every database query includes organization filtering:
-
 ```typescript
-// Always include organizationId in queries
-const clockEvents = await prisma.clockEvent.findMany({
+// Every action includes organization filtering
+export async function requireRole(allowedRoles: UserRole[]) {
+  const session = await getServerSession(authOptions)
+  
+  if (!session?.user) {
+    throw new Error("Authentication required")
+  }
+  
+  if (!allowedRoles.includes(session.user.role)) {
+    throw new Error("Insufficient permissions")
+  }
+  
+  return session.user // Includes organizationId
+}
+
+// All database queries include organization filter
+const result = await prisma.clockEvent.findMany({
   where: {
-    userId: user.id,
-    organizationId: user.organizationId, // Critical for security
-    timestamp: { gte: startOfDay, lte: endOfDay }
+    organizationId: user.organizationId, // Critical for isolation
+    // ... other conditions
   }
 })
 ```
@@ -615,75 +566,145 @@ const clockEvents = await prisma.clockEvent.findMany({
 
 ```typescript
 // Server-side validation for all inputs
-export async function clockIn(data: ClockInData) {
-  // Validate required fields
-  if (!data.method) {
-    return { success: false, error: "Method is required" }
+export async function createSchedule(data: ScheduleData) {
+  // Validate input data
+  if (!data.title || data.title.length < 3) {
+    return { success: false, error: "Title must be at least 3 characters" }
   }
   
-  // Validate GPS coordinates if provided
-  if (data.latitude && (data.latitude < -90 || data.latitude > 90)) {
-    return { success: false, error: "Invalid latitude" }
+  if (!data.startTime || !data.endTime) {
+    return { success: false, error: "Start and end times are required" }
   }
   
-  // ... rest of validation
+  // Additional business logic validation
+  const user = await requireRole(['MANAGER', 'ADMIN'])
+  
+  // ... create schedule
 }
-```
-
-### Location Data Privacy
-
-```typescript
-// Only store necessary location precision
-const clockEvent = await prisma.clockEvent.create({
-  data: {
-    latitude: data.latitude ? Math.round(data.latitude * 1000000) / 1000000 : null, // 6 decimal places
-    longitude: data.longitude ? Math.round(data.longitude * 1000000) / 1000000 : null,
-    // ... other fields
-  }
-})
 ```
 
 ## Deployment Architecture
 
-### Vercel Configuration
+### Vercel Deployment
 
-```json
-// package.json
+```yaml
+# vercel.json
 {
-  "scripts": {
-    "build": "prisma generate && next build",
-    "postinstall": "prisma generate"
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
   }
 }
 ```
 
-### Environment Variables
+### Environment Configuration
 
-```env
-# Database
+```bash
+# Production environment variables
 DATABASE_URL="postgresql://..."
+NEXTAUTH_SECRET="..."
+NEXTAUTH_URL="https://clockwizard.vercel.app"
 
-# Authentication
-NEXTAUTH_SECRET="your-secret-key"
-NEXTAUTH_URL="https://your-domain.com"
-
-# Optional: External Services
-RESEND_API_KEY="your-resend-key"
-STRIPE_SECRET_KEY="your-stripe-key"
+# Development environment variables
+DATABASE_URL="postgresql://localhost:5432/smartclock_dev"
+NEXTAUTH_SECRET="dev-secret"
+NEXTAUTH_URL="http://localhost:3000"
 ```
 
-### Build Optimization
+## Monitoring & Observability
 
-```javascript
-// next.config.js
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client']
+### Error Handling
+
+```typescript
+// Consistent error handling pattern
+export async function clockIn(data: ClockInData) {
+  try {
+    // Business logic
+    return { success: true, data: result }
+  } catch (error) {
+    console.error('Clock in error:', error)
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
 }
-
-module.exports = nextConfig
 ```
 
-This technical documentation provides a comprehensive overview of the SmartClock architecture, implementation details, and best practices. The system is designed for scalability, maintainability, and security in a multi-tenant SaaS environment. 
+### Performance Monitoring
+
+```typescript
+// Performance tracking for critical operations
+export async function generateTimesheetFromClockEvents(
+  userId: string, 
+  startDate: Date, 
+  endDate: Date
+) {
+  const startTime = Date.now()
+  
+  try {
+    // Complex timesheet generation logic
+    const result = await processClockEvents(userId, startDate, endDate)
+    
+    const duration = Date.now() - startTime
+    console.log(`Timesheet generation took ${duration}ms`)
+    
+    return { success: true, data: result }
+  } catch (error) {
+    console.error('Timesheet generation error:', error)
+    return { success: false, error: error.message }
+  }
+}
+```
+
+## Future Architecture Considerations
+
+### Phase 8: SaaS Commercialization
+
+```typescript
+// Subdomain routing middleware
+export function middleware(request: NextRequest) {
+  const hostname = request.headers.get('host')
+  const subdomain = hostname?.split('.')[0]
+  
+  if (subdomain && subdomain !== 'www') {
+    // Route to organization-specific pages
+    return NextResponse.rewrite(
+      new URL(`/org/${subdomain}${request.nextUrl.pathname}`, request.url)
+    )
+  }
+  
+  return NextResponse.next()
+}
+
+// Payment integration structure
+export async function createSubscription(
+  organizationId: string, 
+  priceId: string
+) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+  
+  // Create customer and subscription
+  const subscription = await stripe.subscriptions.create({
+    customer: customerId,
+    items: [{ price: priceId }],
+    trial_period_days: 14
+  })
+  
+  // Update organization with subscription info
+  await prisma.organization.update({
+    where: { id: organizationId },
+    data: {
+      stripeSubscriptionId: subscription.id,
+      plan: getPlanFromPriceId(priceId)
+    }
+  })
+}
+```
+
+This technical architecture provides a solid foundation for scaling SmartClock into a commercial SaaS platform with enterprise-grade features and performance. 

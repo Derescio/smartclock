@@ -2,23 +2,15 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { getAllTeamMembers } from "@/actions/team"
+import { getDepartments } from "@/actions/employees"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
+// import { Badge } from "@/components/ui/badge"
+// import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+// import { Input } from "@/components/ui/input"
 import {
     UsersIcon,
     PlusIcon,
-    SearchIcon,
-    FilterIcon,
-    MoreVerticalIcon,
-    MailIcon,
-    PhoneIcon,
-    MapPinIcon,
-    CalendarIcon,
-    EditIcon,
-    TrashIcon,
     UserCheckIcon,
     Users2Icon
 } from "lucide-react"
@@ -37,8 +29,13 @@ export default async function EmployeesPage() {
         redirect("/dashboard")
     }
 
-    // Get all team members for this organization
-    const employees = await getAllTeamMembers()
+    // Get all team members and departments for this organization
+    const [employees, departmentsResult] = await Promise.all([
+        getAllTeamMembers(),
+        getDepartments()
+    ])
+
+    const departments = departmentsResult.success ? departmentsResult.departments : []
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -127,16 +124,24 @@ export default async function EmployeesPage() {
                                 <UsersIcon className="h-5 w-5" />
                                 <span>Team Members</span>
                             </span>
-                            <Link href="/manager/employees/add">
-                                <Button>
-                                    <PlusIcon className="h-4 w-4 mr-2" />
-                                    Add Employee
-                                </Button>
-                            </Link>
+                            <div className="flex space-x-2">
+                                <Link href="/manager/departments">
+                                    <Button variant="outline">
+                                        <Users2Icon className="h-4 w-4 mr-2" />
+                                        Manage Departments
+                                    </Button>
+                                </Link>
+                                <Link href="/manager/employees/add">
+                                    <Button>
+                                        <PlusIcon className="h-4 w-4 mr-2" />
+                                        Add Employee
+                                    </Button>
+                                </Link>
+                            </div>
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <EmployeeManagementClient employees={employees} />
+                        <EmployeeManagementClient employees={employees} allDepartments={departments} />
                     </CardContent>
                 </Card>
             </div>

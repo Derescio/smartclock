@@ -75,6 +75,8 @@ model Organization {
   timesheets  Timesheet[]
   files       File[] // Added for organization files
   departments Department[]
+  schedules   Schedule[]
+  teams       Team[]
 
   @@map("organizations")
 }
@@ -99,16 +101,21 @@ model User {
   updatedAt      DateTime  @updatedAt
 
   // Relations
-  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  location      Location?    @relation(fields: [locationId], references: [id])
-  department    Department?  @relation("EmployeeDepartment", fields: [departmentId], references: [id])
-  managedDepts  Department[] @relation("DepartmentManager")
-  accounts      Account[]
-  sessions      Session[]
-  clockEvents   ClockEvent[]
-  timesheets    Timesheet[]
-  approvals     Timesheet[]  @relation("ApprovedBy")
-  uploadedFiles File[]       @relation("UploadedBy") // Added for file uploads
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location          Location?    @relation(fields: [locationId], references: [id])
+  department        Department?  @relation("EmployeeDepartment", fields: [departmentId], references: [id])
+  managedDepts      Department[] @relation("DepartmentManager")
+  accounts          Account[]
+  sessions          Session[]
+  clockEvents       ClockEvent[]
+  timesheets        Timesheet[]
+  approvals         Timesheet[]  @relation("ApprovedBy")
+  uploadedFiles     File[]       @relation("UploadedBy") // Added for file uploads
+  assignedSchedules Schedule[]   @relation("ScheduleAssignee")
+  createdSchedules  Schedule[]   @relation("ScheduleCreator")
+  approvedSchedules Schedule[]   @relation("ScheduleApprover")
+  managedTeams      Team[]       @relation("TeamManager")
+  teamMemberships   TeamMember[]
 
   @@map("users")
 }
@@ -130,6 +137,7 @@ model Location {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   users        User[]
   clockEvents  ClockEvent[]
+  schedules    Schedule[]
 
   @@map("locations")
 }
@@ -221,8 +229,94 @@ model Department {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   manager      User?        @relation("DepartmentManager", fields: [managerId], references: [id])
   employees    User[]       @relation("EmployeeDepartment")
+  schedules    Schedule[]
 
   @@map("departments")
+}
+
+// Team model for grouping employees for easier schedule assignment
+model Team {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  color          String? // For UI visualization (#hex color)
+  managerId      String? // Optional team manager
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  manager      User?        @relation("TeamManager", fields: [managerId], references: [id])
+  members      TeamMember[]
+  schedules    Schedule[]
+
+  @@map("teams")
+}
+
+// Junction table for team membership
+model TeamMember {
+  id     String @id @default(cuid())
+  teamId String
+  userId String
+
+  // Relations
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+// Schedule model for managing employee work schedules
+model Schedule {
+  id             String         @id @default(cuid())
+  organizationId String
+  title          String
+  description    String?
+  scheduleType   ScheduleType   @default(SHIFT)
+  status         ScheduleStatus @default(DRAFT)
+
+  // Time settings
+  startDate     DateTime
+  endDate       DateTime? // Null for ongoing schedules
+  startTime     String // Format: "HH:MM" (24-hour)
+  endTime       String // Format: "HH:MM" (24-hour)
+  breakDuration Int? // Break duration in minutes
+
+  // Recurrence settings
+  isRecurring    Boolean            @default(false)
+  recurrence     RecurrencePattern?
+  recurrenceDays String? // JSON array of days for weekly recurrence ["MON", "TUE", "WED"]
+  recurrenceEnd  DateTime? // When recurrence ends
+
+  // Assignment
+  userId       String? // Individual employee assignment
+  departmentId String? // Department-wide assignment
+  locationId   String? // Location requirement
+
+  // Approval workflow
+  createdBy  String
+  approvedBy String?
+  approvedAt DateTime?
+
+  // Metadata
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation("ScheduleAssignee", fields: [userId], references: [id])
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  location     Location?    @relation(fields: [locationId], references: [id])
+  creator      User         @relation("ScheduleCreator", fields: [createdBy], references: [id])
+  approver     User?        @relation("ScheduleApprover", fields: [approvedBy], references: [id])
+  Team         Team?        @relation(fields: [teamId], references: [id])
+  teamId       String?
+
+  @@map("schedules")
 }
 
 // Enums
@@ -275,4 +369,30 @@ enum FileType {
   CONTRACT
   POLICY
   HANDBOOK
+}
+
+enum ScheduleType {
+  SHIFT // Regular work shift
+  MEETING // Meeting or appointment
+  TRAINING // Training session
+  EVENT // Company event
+  OVERTIME // Overtime work
+  ON_CALL // On-call duty
+}
+
+enum ScheduleStatus {
+  DRAFT // Being created/edited
+  PENDING // Awaiting approval
+  APPROVED // Approved and active
+  REJECTED // Rejected by manager
+  CANCELLED // Cancelled schedule
+  COMPLETED // Past schedule that was completed
+}
+
+enum RecurrencePattern {
+  DAILY // Every day
+  WEEKLY // Every week
+  BIWEEKLY // Every two weeks
+  MONTHLY // Every month
+  CUSTOM // Custom pattern
 }

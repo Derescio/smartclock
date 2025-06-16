@@ -342,7 +342,7 @@ export async function updateTeamMemberRole(userId: string, role: string) {
 
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { role: role as any },
+      data: { role: role as 'EMPLOYEE' | 'MANAGER' | 'ADMIN' | 'SUPER_ADMIN' },
       include: {
         location: true,
         organization: true

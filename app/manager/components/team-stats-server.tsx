@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { UsersIcon, ClockIcon, TrendingUpIcon, AlertCircleIcon } from "lucide-react"
-import { getTeamStats } from "../actions"
+import { getTeamStats } from "@/actions/team"
+import Link from "next/link"
 
 export default async function TeamStatsServer() {
     const stats = await getTeamStats()
@@ -16,17 +17,20 @@ export default async function TeamStatsServer() {
     return (
         <div className="space-y-4">
             {/* Total Employees */}
-            <Card>
-                <CardContent className="p-6">
-                    <div className="flex items-center">
-                        <UsersIcon className="h-8 w-8 text-blue-600" />
-                        <div className="ml-4">
-                            <p className="text-sm font-medium text-gray-600">Total Employees</p>
-                            <p className="text-2xl font-bold text-gray-900">{stats.totalEmployees}</p>
+            <Link href="/manager/employees">
+                <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                    <CardContent className="p-6">
+                        <div className="flex items-center">
+                            <UsersIcon className="h-8 w-8 text-blue-600" />
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Total Employees</p>
+                                <p className="text-2xl font-bold text-gray-900">{stats.totalEmployees}</p>
+                                <p className="text-xs text-blue-600 hover:text-blue-800">Click to manage →</p>
+                            </div>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            </Link>
 
             {/* Currently Working */}
             <Card>
@@ -67,12 +71,12 @@ export default async function TeamStatsServer() {
                 <CardContent className="p-6">
                     <div className="flex items-center">
                         <AlertCircleIcon className={`h-8 w-8 ${stats.attendanceRate >= 90 ? 'text-green-600' :
-                                stats.attendanceRate >= 75 ? 'text-yellow-600' : 'text-red-600'
+                            stats.attendanceRate >= 75 ? 'text-yellow-600' : 'text-red-600'
                             }`} />
                         <div className="ml-4">
                             <p className="text-sm font-medium text-gray-600">Attendance Rate</p>
                             <p className={`text-2xl font-bold ${stats.attendanceRate >= 90 ? 'text-green-600' :
-                                    stats.attendanceRate >= 75 ? 'text-yellow-600' : 'text-red-600'
+                                stats.attendanceRate >= 75 ? 'text-yellow-600' : 'text-red-600'
                                 }`}>
                                 {formatPercentage(stats.attendanceRate)}
                             </p>

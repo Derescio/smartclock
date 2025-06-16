@@ -9,17 +9,13 @@ import {
     Users,
     BarChart3,
     Shield,
-    Zap,
     Menu,
     CheckCircle,
     Smartphone,
     Globe,
     Calendar,
     FileText,
-    Bell,
-    Camera,
-    Settings,
-    TrendingUp
+    Bell
 } from "lucide-react"
 
 export default function FeaturesPage() {

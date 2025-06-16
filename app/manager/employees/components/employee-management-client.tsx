@@ -8,15 +8,15 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import {
     SearchIcon,
-    FilterIcon,
     MailIcon,
     PhoneIcon,
     MapPinIcon,
     CalendarIcon,
-    MoreVerticalIcon,
     EditIcon,
     Users2Icon,
-    UserIcon
+    UserIcon,
+    ShieldIcon,
+    ShieldOffIcon
 } from "lucide-react"
 import {
     Select,
@@ -26,6 +26,8 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import Link from "next/link"
+import { toggleEmployeeStatus } from "@/actions/employees"
+import { toast } from "sonner"
 
 interface Employee {
     id: string
@@ -49,18 +51,40 @@ interface Employee {
     } | null
 }
 
-interface EmployeeManagementClientProps {
-    employees: Employee[]
+interface Department {
+    id: string
+    name: string
+    description: string | null
+    color: string | null
+    manager: {
+        id: string
+        name: string | null
+        email: string
+    } | null
+    _count: {
+        employees: number
+    }
 }
 
-export function EmployeeManagementClient({ employees }: EmployeeManagementClientProps) {
+interface EmployeeManagementClientProps {
+    employees: Employee[]
+    allDepartments?: Department[]
+}
+
+export function EmployeeManagementClient({ employees, allDepartments }: EmployeeManagementClientProps) {
     const [searchTerm, setSearchTerm] = useState("")
     const [roleFilter, setRoleFilter] = useState<string>("all")
     const [departmentFilter, setDepartmentFilter] = useState<string>("all")
     const [statusFilter, setStatusFilter] = useState<string>("all")
+    const [togglingStatus, setTogglingStatus] = useState<string | null>(null)
 
-    // Get unique departments for filter
+    // Use all departments if provided, otherwise fall back to departments from employees
     const departments = useMemo(() => {
+        if (allDepartments && allDepartments.length > 0) {
+            return allDepartments
+        }
+
+        // Fallback: get departments from employees
         const uniqueDepts = new Map()
         employees.forEach(emp => {
             if (emp.department) {
@@ -68,7 +92,7 @@ export function EmployeeManagementClient({ employees }: EmployeeManagementClient
             }
         })
         return Array.from(uniqueDepts.values())
-    }, [employees])
+    }, [employees, allDepartments])
 
     // Filter employees based on search and filters
     const filteredEmployees = useMemo(() => {
@@ -114,6 +138,29 @@ export function EmployeeManagementClient({ employees }: EmployeeManagementClient
 
     const getDepartmentColor = (color: string | null) => {
         return color || '#6B7280' // Default gray
+    }
+
+    // Handle status toggle
+    const handleToggleStatus = async (employeeId: string) => {
+        setTogglingStatus(employeeId)
+
+        try {
+            const result = await toggleEmployeeStatus(employeeId)
+
+            if (result.success) {
+                const action = result.action === 'activated' ? 'activated' : 'deactivated'
+                toast.success(`Employee has been ${action}`)
+                // Refresh the page to show updated status
+                window.location.reload()
+            } else {
+                toast.error(result.error || "Failed to update employee status")
+            }
+        } catch (error) {
+            console.error("Error toggling employee status:", error)
+            toast.error("An unexpected error occurred")
+        } finally {
+            setTogglingStatus(null)
+        }
     }
 
     return (
@@ -272,6 +319,22 @@ export function EmployeeManagementClient({ employees }: EmployeeManagementClient
                                         <Badge className={getStatusColor(employee.isActive)}>
                                             {employee.isActive ? 'Active' : 'Inactive'}
                                         </Badge>
+
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleToggleStatus(employee.id)}
+                                            disabled={togglingStatus === employee.id}
+                                            title={employee.isActive ? 'Deactivate employee' : 'Activate employee'}
+                                        >
+                                            {togglingStatus === employee.id ? (
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500" />
+                                            ) : employee.isActive ? (
+                                                <ShieldOffIcon className="h-4 w-4 text-red-500" />
+                                            ) : (
+                                                <ShieldIcon className="h-4 w-4 text-green-500" />
+                                            )}
+                                        </Button>
 
                                         <Link href={`/manager/employees/${employee.id}/edit`}>
                                             <Button variant="ghost" size="sm">
