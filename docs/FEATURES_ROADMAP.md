@@ -100,6 +100,7 @@
 - [x] **Schedule Editing** - Full edit capabilities with pre-filled forms and validation
 - [x] **✅ FIXED: Team Schedule Assignment** - Team members now properly see schedules assigned to their teams
 - [x] **✅ FIXED: Past Schedule Filtering** - Non-recurring past schedules are now properly filtered from manager view
+- [x] **✅ FIXED: Assignment Clearing** - Ability to clear individual/team/department/location assignments from schedules
 
 ### Employee Schedule Experience
 - [x] **Real-time Schedule Viewing** - Employees see their daily schedules with all assignment details
@@ -168,6 +169,9 @@
 - [x] **✅ NEW: Bulk Operations** - Efficient approval of multiple timesheets
 - [ ] **Custom report builder** - User-defined reports with flexible parameters
 - [ ] **Advanced forecasting** - Predictive analytics for staffing
+- [ ] **📋 NEW: Attendance Reports** - Comprehensive attendance tracking and analysis for managers
+- [ ] **⏰ NEW: Hours Summary Reports** - Detailed hours breakdown by employee, team, department, and date range
+- [ ] **📊 NEW: Export Data System** - Advanced export functionality for reports (CSV, Excel, PDF) with custom filters
 
 ### Location Management
 - [x] **Complete location CRUD** - Create, read, update, delete locations
@@ -232,6 +236,20 @@
 - [ ] **Personal Analytics** - Individual performance and attendance insights
 - [ ] **Schedule Requests** - Request schedule changes or time off
 - [ ] **Document Management** - Access personal employment documents
+- [ ] **🆕 Enhanced Time Off System** - Comprehensive PTO management with:
+  - Multiple leave types (vacation, sick, personal, bereavement)
+  - Balance tracking and accrual calculations
+  - Manager approval workflow with delegation
+  - Calendar integration and conflict detection
+  - Automated notifications and reminders
+- [ ] **🆕 Advanced Issue Reporting** - Complete workplace issue management with:
+  - Rich text editor for detailed issue descriptions
+  - Multiple image upload support with compression
+  - Issue categorization (safety, harassment, equipment, etc.)
+  - Priority levels and escalation workflows
+  - Anonymous reporting options
+  - Manager assignment and tracking
+  - Resolution timeline and follow-up system
 
 ### Advanced Integrations
 - [ ] **Payroll System Integration** - Direct integration with popular payroll providers
@@ -239,6 +257,16 @@
 - [ ] **Accounting Software** - QuickBooks, Xero, and other accounting integrations
 - [ ] **Communication Tools** - Slack, Teams, and email notifications
 - [ ] **Calendar Integration** - Google Calendar, Outlook synchronization
+- [ ] **💰 NEW: Automated Salary Calculation System** - Premium feature for salary processing:
+  - Configurable salary structures (hourly, salary, commission, bonus)
+  - Automatic overtime calculations with customizable rules
+  - Holiday pay and PTO calculations
+  - Deduction management (taxes, benefits, garnishments)
+  - Multi-location pay rate support
+  - Salary history tracking and audit trails
+  - Integration with separate payroll database table
+  - Role-based access to salary information
+  - Automated payroll report generation
 
 ### Mobile Application
 - [ ] **Native Mobile Apps** - iOS and Android applications
@@ -257,6 +285,7 @@
 - **✅ Team Schedule Visibility**: Fixed team members not seeing schedules assigned to their teams
 - **✅ Past Schedule Filtering**: Non-recurring past schedules are now properly hidden from manager view
 - **✅ Reports & Analytics Implementation**: Built comprehensive timesheet approval system
+- **✅ Schedule Assignment Clearing**: Fixed ability to clear individual/team/department/location assignments from schedules
 
 ### 🚀 **New Features Added**
 - **Timesheet Approval Workflow**: Complete approval system with role-based permissions

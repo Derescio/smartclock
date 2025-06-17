@@ -139,6 +139,18 @@ actions/
 - **Advanced Interface**: Search, filter, and manage pending approvals
 - **Notes System**: Add approval/rejection notes with required rejection reasons
 
+### **Issue 5: Schedule Assignment Clearing - RESOLVED**
+**Problems Fixed:**
+- Unable to clear individual/team/department/location assignments from schedules
+- Form submission passing undefined instead of null for clearing fields
+- Database not updating when trying to remove assignments
+
+**Solutions Implemented:**
+- **Fixed Form Logic**: Changed form submission to pass null instead of undefined for clearing assignments
+- **Updated Action Types**: Modified updateSchedule function to accept null values for assignment fields
+- **Database Clearing**: Proper null value handling to clear existing assignments in database
+- **Enhanced UX**: "No value" options in all assignment dropdowns work correctly
+
 ---
 
 ## 💰 Phase 8: SaaS Commercialization (Planned)
@@ -189,6 +201,25 @@ ENTERPRISE PLUS (Custom pricing)
 - **DNS Management**: Wildcard subdomain support with SSL certificates
 - **Routing Middleware**: Organization resolution from subdomain
 - **Custom Domains**: Enterprise support for custom domain mapping
+
+### **🆕 Advanced Features Pipeline**
+**Manager Reporting Suite**:
+- **📋 Attendance Reports**: Comprehensive attendance tracking and analysis
+- **⏰ Hours Summary Reports**: Detailed hours breakdown by employee, team, department, and date range  
+- **📊 Export Data System**: Advanced export functionality (CSV, Excel, PDF) with custom filters
+- **📈 Trend Analysis**: Historical data insights and performance comparisons
+
+**Employee Self-Service Portal**:
+- **🆕 Enhanced Time Off System**: Comprehensive PTO management with balance tracking and approval workflow
+- **🆕 Advanced Issue Reporting**: Complete workplace issue management with rich text editor and multiple image uploads
+- **📱 Mobile-Optimized Interface**: Responsive design optimized for field workers
+- **🔔 Smart Notifications**: Real-time updates on requests and approvals
+
+**Premium Payroll Integration**:
+- **💰 Automated Salary Calculation**: Based on approved timesheets with configurable overtime and holiday rules
+- **📊 Payroll Database Integration**: Separate secure table for sensitive salary information
+- **🔒 Role-Based Salary Access**: Strict permissions and audit trails for salary data
+- **🎯 Multi-Rate Support**: Different rates for locations, shifts, and overtime calculations
 
 ---
 

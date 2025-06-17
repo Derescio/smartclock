@@ -358,6 +358,30 @@ You have the right to:
 - **Offline Mode** - Limited functionality when internet is unavailable
 - **Advanced Reporting** - Detailed personal time analytics
 
+### Editing Schedules
+
+To edit an existing schedule:
+
+1. **Navigate to Schedule Management**
+   - Go to Manager Dashboard → Schedules
+   - Find the schedule you want to edit
+   - Click the "Edit" button
+
+2. **Modify Schedule Details**
+   - Update basic information (title, description, type)
+   - Adjust dates and times as needed
+   - Modify recurrence patterns if applicable
+
+3. **Change Assignments**
+   - Select a different assignment type (Individual, Team, Department, Location, or None)
+   - Choose specific assignees from the dropdown menus
+   - **Clearing Assignments**: Select "None" as assignment type or "No value" in dropdowns to remove existing assignments
+
+4. **Save Changes**
+   - Review all modifications
+   - Click "Update Schedule" to save changes
+   - Schedule will maintain its current approval status
+
 ---
 
 ## 📞 Support Information

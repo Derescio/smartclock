@@ -8,25 +8,12 @@ export async function getOrganizationSchedules() {
   try {
     const user = await requireRole(['MANAGER', 'ADMIN'])
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0) // Start of today
-
     const schedules = await prisma.schedule.findMany({
       where: {
         organizationId: user.organizationId,
         isActive: true,
-        // Filter out past non-recurring schedules
-        OR: [
-          // Include all recurring schedules (regardless of start date)
-          { isRecurring: true },
-          // Include non-recurring schedules that are today or in the future
-          {
-            isRecurring: false,
-            startDate: {
-              gte: today
-            }
-          }
-        ]
+        // Managers should see ALL schedules regardless of status or date
+        // They need to manage pending schedules and review past ones
       },
       include: {
         user: {
@@ -74,6 +61,7 @@ export async function getOrganizationSchedules() {
         }
       },
       orderBy: [
+        { status: 'asc' }, // Show PENDING first, then others
         { startDate: 'asc' },
         { startTime: 'asc' }
       ]
@@ -180,10 +168,10 @@ export async function updateSchedule(scheduleId: string, data: {
   recurrence?: string
   recurrenceDays?: string[]
   recurrenceEnd?: string
-  userId?: string
-  departmentId?: string
-  locationId?: string
-  teamId?: string
+  userId?: string | null
+  departmentId?: string | null
+  locationId?: string | null
+  teamId?: string | null
   status?: string
 }) {
   try {
@@ -203,6 +191,7 @@ export async function updateSchedule(scheduleId: string, data: {
     if (data.recurrence !== undefined) updateData.recurrence = data.recurrence
     if (data.recurrenceDays !== undefined) updateData.recurrenceDays = data.recurrenceDays ? JSON.stringify(data.recurrenceDays) : null
     if (data.recurrenceEnd !== undefined) updateData.recurrenceEnd = data.recurrenceEnd ? new Date(data.recurrenceEnd) : null
+    // Always update assignment fields to allow clearing them (null values)
     if (data.userId !== undefined) updateData.userId = data.userId
     if (data.departmentId !== undefined) updateData.departmentId = data.departmentId
     if (data.locationId !== undefined) updateData.locationId = data.locationId
@@ -561,11 +550,6 @@ export async function getTodaysSchedule() {
     const user = await requireRole(['MANAGER', 'ADMIN', 'EMPLOYEE'])
 
     const today = new Date()
-    const startOfDay = new Date(today)
-    startOfDay.setHours(0, 0, 0, 0)
-    
-    const endOfDay = new Date(today)
-    endOfDay.setHours(23, 59, 59, 999)
 
     // Get user's team IDs first to avoid nested queries
     const userTeams = await prisma.teamMember.findMany({
@@ -574,58 +558,39 @@ export async function getTodaysSchedule() {
     })
     const userTeamIds = userTeams.map(tm => tm.teamId)
 
-    // Find schedules for today that apply to this user
-    const schedules = await prisma.schedule.findMany({
+    // Get schedules that apply to this user with priority order:
+    // 1. Direct user assignment (highest priority)
+    // 2. Team assignment (if user is member)
+    // 3. Department assignment (if user has department and schedule has no specific user/team)
+    // 4. Location assignment (if user has location and schedule has no specific user/team/department)
+    const userSchedules = await prisma.schedule.findMany({
       where: {
         organizationId: user.organizationId,
         isActive: true,
         status: 'APPROVED',
         OR: [
-          // Direct assignment to user
+          // 1. Direct assignment to user (highest priority)
           { userId: user.id },
-          // Department assignment (if user has department)
-          ...(user.departmentId ? [{ 
-            departmentId: user.departmentId,
-            userId: null
-          }] : []),
-          // Location assignment (if user has location)
-          ...(user.locationId ? [{ 
-            locationId: user.locationId,
-            userId: null,
-            departmentId: null
-          }] : []),
-          // Team assignment - fix the nested query issue
+          // 2. Team assignment (user must be team member)
           ...(userTeamIds.length > 0 ? [{
             teamId: {
               in: userTeamIds
             },
+            userId: null // Only team-wide schedules, not user-specific
+          }] : []),
+          // 3. Department assignment (user must have department, schedule must not have specific user/team)
+          ...(user.departmentId ? [{ 
+            departmentId: user.departmentId,
             userId: null,
-            departmentId: null,
-            locationId: null
+            teamId: null // Only department-wide schedules
+          }] : []),
+          // 4. Location assignment (user must have location, schedule must not have specific user/team/department)
+          ...(user.locationId ? [{ 
+            locationId: user.locationId,
+            userId: null,
+            teamId: null,
+            departmentId: null // Only location-wide schedules
           }] : [])
-        ],
-        AND: [
-          {
-            OR: [
-              // Single day schedule for today
-              {
-                startDate: {
-                  gte: startOfDay,
-                  lte: endOfDay
-                },
-                isRecurring: false
-              },
-              // Recurring schedule that applies today
-              {
-                isRecurring: true,
-                startDate: { lte: today },
-                OR: [
-                  { recurrenceEnd: null },
-                  { recurrenceEnd: { gte: today } }
-                ]
-              }
-            ]
-          }
         ]
       },
       include: {
@@ -656,35 +621,177 @@ export async function getTodaysSchedule() {
       }
     })
 
-    // Filter recurring schedules by day of week
-    const todaySchedules = schedules.filter(schedule => {
-      if (!schedule.isRecurring) return true
-      
-      if (schedule.recurrenceDays) {
-        try {
-          const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-          const todayDay = dayNames[today.getDay()]
-          const recurrenceDays = JSON.parse(schedule.recurrenceDays)
-          return recurrenceDays.includes(todayDay)
-        } catch (error) {
-          console.error('Error parsing recurrence days:', error)
-          return false
+    // Now filter by date - more flexible approach
+    const todaySchedules = userSchedules.filter(schedule => {
+      // For recurring schedules
+      if (schedule.isRecurring) {
+        // Check if recurring schedule is still active
+        const scheduleStart = new Date(schedule.startDate)
+        const scheduleEnd = schedule.recurrenceEnd ? new Date(schedule.recurrenceEnd) : null
+        
+        // Must have started and not ended
+        if (scheduleStart > today) return false
+        if (scheduleEnd && scheduleEnd < today) return false
+        
+        // Check day of week
+        if (schedule.recurrenceDays) {
+          try {
+            // Use user's local timezone for day calculation instead of server timezone
+            const userToday = new Date()
+            const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+            const todayDay = dayNames[userToday.getDay()]
+            
+            // Parse the JSON recurrenceDays (should now be clean after the fix)
+            let recurrenceDays = []
+            try {
+              recurrenceDays = JSON.parse(schedule.recurrenceDays)
+            } catch (parseError) {
+              console.error('Error parsing recurrenceDays:', parseError)
+              // Fallback for any remaining corrupted data
+              const dayMatches = schedule.recurrenceDays.match(/"(MON|TUE|WED|THU|FRI|SAT|SUN)"/g)
+              if (dayMatches) {
+                recurrenceDays = [...new Set(dayMatches.map(match => match.replace(/"/g, '')))]
+              }
+            }
+            
+            // Ensure it's an array and contains valid days
+            if (!Array.isArray(recurrenceDays)) {
+              console.error('recurrenceDays is not an array:', recurrenceDays)
+              return false
+            }
+            
+            // Clean up the array - remove any non-day values
+            const validDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+            recurrenceDays = recurrenceDays.filter((day: string) => validDays.includes(day))
+            
+            return recurrenceDays.includes(todayDay)
+          } catch (error) {
+            console.error('Error parsing recurrence days:', error)
+            return false
+          }
         }
+        return true
+      } else {
+        // For non-recurring schedules - check if it's for today OR if it's a multi-day schedule that includes today
+        const scheduleStart = new Date(schedule.startDate)
+        const scheduleEnd = schedule.endDate ? new Date(schedule.endDate) : scheduleStart
+        
+        // Reset times to compare dates only
+        scheduleStart.setHours(0, 0, 0, 0)
+        scheduleEnd.setHours(23, 59, 59, 999)
+        
+        const todayStart = new Date(today)
+        todayStart.setHours(0, 0, 0, 0)
+        
+        const isToday = todayStart >= scheduleStart && todayStart <= scheduleEnd
+        
+        return isToday
       }
-      
-      return true
     })
-
-    // Debug logging for team schedules
-    if (userTeamIds.length > 0) {
-      console.log(`User ${user.id} is member of teams:`, userTeamIds)
-      const teamSchedulesCount = todaySchedules.filter(s => s.teamId).length
-      console.log(`Found ${teamSchedulesCount} team schedules for today`)
-    }
 
     return { success: true, schedules: todaySchedules }
   } catch (error) {
     console.error('Get todays schedule error:', error)
     return { success: false, error: 'Failed to fetch today\'s schedule' }
+  }
+}
+
+export async function getUserSchedulesSimple() {
+  try {
+    const user = await requireRole(['MANAGER', 'ADMIN', 'EMPLOYEE'])
+
+    // Get user's team memberships
+    const userTeams = await prisma.teamMember.findMany({
+      where: { userId: user.id },
+      select: { teamId: true }
+    })
+    const userTeamIds = userTeams.map(tm => tm.teamId)
+
+    // Get all approved schedules for this user's teams
+    const teamSchedules = await prisma.schedule.findMany({
+      where: {
+        organizationId: user.organizationId,
+        isActive: true,
+        status: 'APPROVED',
+        teamId: {
+          in: userTeamIds
+        }
+      },
+      include: {
+        location: {
+          select: {
+            id: true,
+            name: true,
+            address: true
+          }
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            color: true
+          }
+        },
+        Team: {
+          select: {
+            id: true,
+            name: true,
+            color: true
+          }
+        }
+      },
+      orderBy: {
+        startDate: 'desc'
+      }
+    })
+
+    return { success: true, schedules: teamSchedules }
+  } catch (error) {
+    console.error('Get user schedules simple error:', error)
+    return { success: false, error: 'Failed to fetch user schedules' }
+  }
+}
+
+export async function fixCorruptedRecurrenceDays() {
+  try {
+    const user = await requireRole(['ADMIN'])
+
+    // Find all schedules with corrupted recurrence days
+    const corruptedSchedules = await prisma.schedule.findMany({
+      where: {
+        organizationId: user.organizationId,
+        isRecurring: true,
+        recurrenceDays: {
+          not: null
+        }
+      }
+    })
+
+    for (const schedule of corruptedSchedules) {
+      if (schedule.recurrenceDays) {
+        try {
+          // Try to extract day names from corrupted data
+          const dayMatches = schedule.recurrenceDays.match(/"(MON|TUE|WED|THU|FRI|SAT|SUN)"/g)
+          if (dayMatches) {
+            const cleanDays = [...new Set(dayMatches.map(match => match.replace(/"/g, '')))]
+            const fixedRecurrenceDays = JSON.stringify(cleanDays)
+
+            await prisma.schedule.update({
+              where: { id: schedule.id },
+              data: {
+                recurrenceDays: fixedRecurrenceDays
+              }
+            })
+          }
+        } catch (error) {
+          console.error(`Failed to fix schedule ${schedule.id}:`, error)
+        }
+      }
+    }
+
+    return { success: true, message: `Fixed ${corruptedSchedules.length} schedules` }
+  } catch (error) {
+    console.error('Fix corrupted recurrence days error:', error)
+    return { success: false, error: 'Failed to fix corrupted data' }
   }
 } 

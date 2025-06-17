@@ -169,6 +169,118 @@ export async function upgradeSubscription(subscriptionId: string, newPriceId: st
 
 ---
 
+## 🚀 **Phase 8D: Advanced Features & Premium Services (Weeks 7-8)**
+
+### **Manager Reporting Suite**
+```typescript
+// Advanced reporting system for managers
+export async function generateAttendanceReport(filters: {
+  dateRange: { start: string; end: string }
+  employees?: string[]
+  departments?: string[]
+  teams?: string[]
+  locations?: string[]
+}) {
+  // Generate comprehensive attendance analysis
+  // Include late arrivals, early departures, absences
+  // Calculate attendance percentages and trends
+  // Export to multiple formats (CSV, Excel, PDF)
+}
+
+export async function generateHoursSummaryReport(filters: ReportFilters) {
+  // Detailed hours breakdown by various dimensions
+  // Regular hours, overtime, break time analysis
+  // Comparative analysis across time periods
+  // Team and individual performance metrics
+}
+```
+
+**Manager Dashboard Enhancements**:
+- **📋 Attendance Reports**: Comprehensive attendance tracking and analysis
+- **⏰ Hours Summary Reports**: Detailed hours breakdown by employee, team, department, and date range
+- **📊 Export Data System**: Advanced export functionality (CSV, Excel, PDF) with custom filters
+- **📈 Trend Analysis**: Historical data insights and performance comparisons
+- **🎯 Performance Metrics**: KPI tracking and goal setting for teams
+
+### **Employee Self-Service Portal**
+```typescript
+// Time off request system
+export async function submitTimeOffRequest(data: {
+  employeeId: string
+  leaveType: 'VACATION' | 'SICK' | 'PERSONAL' | 'BEREAVEMENT'
+  startDate: string
+  endDate: string
+  reason?: string
+  isPartialDay?: boolean
+  hoursRequested?: number
+}) {
+  // Submit request with approval workflow
+  // Check balance and accrual rules
+  // Validate against schedules and conflicts
+  // Send notifications to managers
+}
+
+// Issue reporting system
+export async function submitIssueReport(data: {
+  employeeId: string
+  category: 'SAFETY' | 'HARASSMENT' | 'EQUIPMENT' | 'POLICY' | 'OTHER'
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+  title: string
+  description: string
+  images?: File[]
+  isAnonymous?: boolean
+  location?: string
+}) {
+  // Create issue with proper categorization
+  // Handle image uploads and compression
+  // Assign to appropriate managers
+  // Track resolution timeline
+}
+```
+
+**Employee Dashboard Enhancements**:
+- **🆕 Enhanced Time Off System**: Comprehensive PTO management with balance tracking
+- **🆕 Advanced Issue Reporting**: Complete workplace issue management with rich text and images
+- **📱 Mobile-Optimized Interface**: Responsive design for field workers
+- **🔔 Smart Notifications**: Real-time updates on requests and approvals
+
+### **Premium Payroll Integration**
+```typescript
+// Automated salary calculation system
+export async function calculatePayroll(payPeriod: {
+  startDate: string
+  endDate: string
+  organizationId: string
+}) {
+  // Calculate salaries based on approved timesheets
+  // Apply overtime rules and holiday pay
+  // Process deductions and benefits
+  // Generate payroll records in separate table
+  // Create audit trail for compliance
+}
+
+// Salary structure management
+interface SalaryStructure {
+  employeeId: string
+  baseRate: number
+  salaryType: 'HOURLY' | 'SALARY' | 'COMMISSION'
+  overtimeRate?: number
+  holidayRate?: number
+  deductions: Deduction[]
+  benefits: Benefit[]
+  effectiveDate: Date
+}
+```
+
+**Payroll Features** (Premium Tier):
+- **💰 Automated Salary Calculation**: Based on approved timesheets and configurable rules
+- **📊 Payroll Database Integration**: Separate table for sensitive salary information
+- **🔒 Role-Based Salary Access**: Strict permissions for salary data
+- **📈 Salary History Tracking**: Complete audit trail for compliance
+- **🎯 Multi-Rate Support**: Different rates for locations, shifts, and overtime
+
+---
+
 ## 📈 **Success Metrics & KPIs**
 
 ### **Technical Metrics**
@@ -276,6 +388,16 @@ FROM Organization o;
 - **Days 1-3**: Performance testing and optimization
 - **Days 4-5**: Security audit and documentation
 - **Days 6-7**: Final testing and launch preparation
+
+### **Week 7: Advanced Features**
+- **Days 1-3**: Manager reporting suite
+- **Days 4-5**: Employee self-service portal
+- **Days 6-7**: Premium payroll integration
+
+### **Week 8: Final Testing**
+- **Days 1-3**: Final testing and bug fixes
+- **Days 4-5**: Launch preparation
+- **Days 6-7**: Final launch and post-launch review
 
 ---
 

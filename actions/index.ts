@@ -73,7 +73,9 @@ export {
   rejectSchedule,
   getSchedulesByEmployee,
   getScheduleStats,
-  getTodaysSchedule
+  getTodaysSchedule,
+  getUserSchedulesSimple,
+  fixCorruptedRecurrenceDays
 } from './schedules'
 
 // Timesheet Management

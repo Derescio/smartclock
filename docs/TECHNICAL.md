@@ -958,6 +958,48 @@ function validateDateRange(startDate: string, endDate: string) {
 }
 ```
 
+### **Schedule Assignment Management**
+
+Enhanced schedule assignment handling with proper null value support:
+
+```typescript
+// Fixed assignment clearing logic in form submission
+const result = await updateSchedule(schedule.id, {
+  // ... other fields
+  // Always include assignment fields to allow clearing them
+  userId: formData.assignmentType === "individual" && formData.userId && formData.userId !== "none" ? formData.userId : null,
+  teamId: formData.assignmentType === "team" && formData.teamId && formData.teamId !== "none" ? formData.teamId : null,
+  departmentId: formData.assignmentType === "department" && formData.departmentId && formData.departmentId !== "none" ? formData.departmentId : null,
+  locationId: formData.assignmentType === "location" && formData.locationId && formData.locationId !== "none" ? formData.locationId : null
+})
+
+// Updated action function to handle null values
+export async function updateSchedule(scheduleId: string, data: {
+  // ... other fields
+  userId?: string | null      // Allow null to clear assignment
+  departmentId?: string | null
+  locationId?: string | null
+  teamId?: string | null
+  // ... other fields
+}) {
+  // ... validation logic
+  
+  // Assignment fields are always updated to allow clearing
+  if (data.userId !== undefined) updateData.userId = data.userId
+  if (data.departmentId !== undefined) updateData.departmentId = data.departmentId
+  if (data.locationId !== undefined) updateData.locationId = data.locationId
+  if (data.teamId !== undefined) updateData.teamId = data.teamId
+  
+  // ... rest of update logic
+}
+```
+
+**Key Technical Improvements:**
+- **Null vs Undefined Handling**: Form now correctly passes `null` for clearing fields instead of `undefined`
+- **TypeScript Type Safety**: Updated function signatures to accept `string | null` for assignment fields
+- **Database Clearing**: Proper null value handling ensures assignments are cleared in the database
+- **UI Enhancement**: "No value" dropdown options work correctly with proper value handling
+
 ---
 
 ## Production Readiness Assessment
@@ -1002,6 +1044,189 @@ function validateDateRange(startDate: string, endDate: string) {
 - Codebase structure ready for feature gating implementation
 - Performance optimization completed for scale
 - Security patterns established for commercial deployment
+
+---
+
+## 🚀 **Planned Database Schema Extensions (Phase 8+)**
+
+### **Employee Self-Service Tables**
+```sql
+-- Time Off Requests
+CREATE TABLE TimeOffRequest (
+  id VARCHAR(30) PRIMARY KEY,
+  employeeId VARCHAR(30) REFERENCES User(id),
+  organizationId VARCHAR(30) REFERENCES Organization(id),
+  leaveType ENUM('VACATION', 'SICK', 'PERSONAL', 'BEREAVEMENT', 'MATERNITY', 'PATERNITY'),
+  startDate DATE NOT NULL,
+  endDate DATE NOT NULL,
+  hoursRequested DECIMAL(5,2),
+  isPartialDay BOOLEAN DEFAULT false,
+  reason TEXT,
+  status ENUM('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED') DEFAULT 'PENDING',
+  approvedBy VARCHAR(30) REFERENCES User(id),
+  approvedAt TIMESTAMP,
+  approverNotes TEXT,
+  balanceAtRequest DECIMAL(8,2),
+  balanceAfterRequest DECIMAL(8,2),
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Issue Reports
+CREATE TABLE IssueReport (
+  id VARCHAR(30) PRIMARY KEY,
+  employeeId VARCHAR(30) REFERENCES User(id),
+  organizationId VARCHAR(30) REFERENCES Organization(id),
+  title VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL,
+  category ENUM('SAFETY', 'HARASSMENT', 'EQUIPMENT', 'POLICY', 'WORKPLACE', 'OTHER'),
+  priority ENUM('LOW', 'MEDIUM', 'HIGH', 'URGENT') DEFAULT 'MEDIUM',
+  status ENUM('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED') DEFAULT 'OPEN',
+  isAnonymous BOOLEAN DEFAULT false,
+  locationId VARCHAR(30) REFERENCES Location(id),
+  assignedTo VARCHAR(30) REFERENCES User(id),
+  assignedAt TIMESTAMP,
+  resolvedAt TIMESTAMP,
+  resolutionNotes TEXT,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Issue Report Images
+CREATE TABLE IssueReportImage (
+  id VARCHAR(30) PRIMARY KEY,
+  issueReportId VARCHAR(30) REFERENCES IssueReport(id),
+  fileName VARCHAR(255) NOT NULL,
+  fileUrl VARCHAR(500) NOT NULL,
+  fileSize INTEGER,
+  mimeType VARCHAR(100),
+  uploadedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Time Off Balances
+CREATE TABLE TimeOffBalance (
+  id VARCHAR(30) PRIMARY KEY,
+  employeeId VARCHAR(30) REFERENCES User(id),
+  organizationId VARCHAR(30) REFERENCES Organization(id),
+  leaveType ENUM('VACATION', 'SICK', 'PERSONAL', 'BEREAVEMENT'),
+  currentBalance DECIMAL(8,2) DEFAULT 0,
+  accrualRate DECIMAL(5,2) DEFAULT 0,
+  maxBalance DECIMAL(8,2),
+  carryOverLimit DECIMAL(8,2),
+  yearStartBalance DECIMAL(8,2) DEFAULT 0,
+  yearUsed DECIMAL(8,2) DEFAULT 0,
+  yearAccrued DECIMAL(8,2) DEFAULT 0,
+  effectiveYear INTEGER NOT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### **Premium Payroll System Tables**
+```sql
+-- Employee Salary Structures
+CREATE TABLE SalaryStructure (
+  id VARCHAR(30) PRIMARY KEY,
+  employeeId VARCHAR(30) REFERENCES User(id),
+  organizationId VARCHAR(30) REFERENCES Organization(id),
+  salaryType ENUM('HOURLY', 'SALARY', 'COMMISSION', 'CONTRACT') NOT NULL,
+  baseRate DECIMAL(10,2) NOT NULL,
+  currency VARCHAR(3) DEFAULT 'USD',
+  overtimeRate DECIMAL(10,2),
+  overtimeThreshold DECIMAL(4,1) DEFAULT 40.0,
+  holidayRate DECIMAL(10,2),
+  locationId VARCHAR(30) REFERENCES Location(id),
+  effectiveDate DATE NOT NULL,
+  endDate DATE,
+  isActive BOOLEAN DEFAULT true,
+  createdBy VARCHAR(30) REFERENCES User(id),
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Payroll Calculations
+CREATE TABLE PayrollCalculation (
+  id VARCHAR(30) PRIMARY KEY,
+  employeeId VARCHAR(30) REFERENCES User(id),
+  organizationId VARCHAR(30) REFERENCES Organization(id),
+  payPeriodStart DATE NOT NULL,
+  payPeriodEnd DATE NOT NULL,
+  regularHours DECIMAL(6,2) DEFAULT 0,
+  overtimeHours DECIMAL(6,2) DEFAULT 0,
+  holidayHours DECIMAL(6,2) DEFAULT 0,
+  sickHours DECIMAL(6,2) DEFAULT 0,
+  vacationHours DECIMAL(6,2) DEFAULT 0,
+  regularPay DECIMAL(10,2) DEFAULT 0,
+  overtimePay DECIMAL(10,2) DEFAULT 0,
+  holidayPay DECIMAL(10,2) DEFAULT 0,
+  bonusPay DECIMAL(10,2) DEFAULT 0,
+  grossPay DECIMAL(10,2) DEFAULT 0,
+  totalDeductions DECIMAL(10,2) DEFAULT 0,
+  netPay DECIMAL(10,2) DEFAULT 0,
+  status ENUM('DRAFT', 'CALCULATED', 'APPROVED', 'PAID') DEFAULT 'DRAFT',
+  calculatedAt TIMESTAMP,
+  calculatedBy VARCHAR(30) REFERENCES User(id),
+  approvedAt TIMESTAMP,
+  approvedBy VARCHAR(30) REFERENCES User(id),
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Payroll Deductions
+CREATE TABLE PayrollDeduction (
+  id VARCHAR(30) PRIMARY KEY,
+  payrollCalculationId VARCHAR(30) REFERENCES PayrollCalculation(id),
+  deductionType ENUM('TAX_FEDERAL', 'TAX_STATE', 'TAX_LOCAL', 'SOCIAL_SECURITY', 'MEDICARE', 'HEALTH_INSURANCE', 'DENTAL_INSURANCE', 'VISION_INSURANCE', 'RETIREMENT_401K', 'LIFE_INSURANCE', 'GARNISHMENT', 'OTHER'),
+  description VARCHAR(255),
+  amount DECIMAL(10,2) NOT NULL,
+  isPercentage BOOLEAN DEFAULT false,
+  percentage DECIMAL(5,2),
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### **Advanced Reporting Tables**
+```sql
+-- Report Configurations
+CREATE TABLE ReportConfiguration (
+  id VARCHAR(30) PRIMARY KEY,
+  organizationId VARCHAR(30) REFERENCES Organization(id),
+  createdBy VARCHAR(30) REFERENCES User(id),
+  reportType ENUM('ATTENDANCE', 'HOURS_SUMMARY', 'PAYROLL', 'TIMESHEET', 'SCHEDULE', 'CUSTOM'),
+  reportName VARCHAR(255) NOT NULL,
+  description TEXT,
+  filters JSON,
+  columns JSON,
+  sortOrder JSON,
+  isPublic BOOLEAN DEFAULT false,
+  isScheduled BOOLEAN DEFAULT false,
+  scheduleFrequency ENUM('DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY'),
+  nextRunDate TIMESTAMP,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Report Execution History
+CREATE TABLE ReportExecution (
+  id VARCHAR(30) PRIMARY KEY,
+  reportConfigurationId VARCHAR(30) REFERENCES ReportConfiguration(id),
+  executedBy VARCHAR(30) REFERENCES User(id),
+  status ENUM('PENDING', 'RUNNING', 'COMPLETED', 'FAILED'),
+  recordCount INTEGER,
+  fileUrl VARCHAR(500),
+  fileFormat ENUM('CSV', 'EXCEL', 'PDF', 'JSON'),
+  executionTime INTEGER,
+  errorMessage TEXT,
+  executedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Key Technical Considerations**:
+- **Data Privacy**: Separate payroll tables with enhanced security
+- **Audit Trails**: Complete tracking of all salary and time off changes
+- **Performance**: Indexed queries for large-scale reporting
+- **Compliance**: GDPR and labor law compliance built into schema design
+- **Scalability**: Designed to handle thousands of employees per organization
 
 ---
 

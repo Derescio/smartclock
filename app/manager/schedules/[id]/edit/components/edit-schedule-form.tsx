@@ -30,7 +30,8 @@ import {
     MapPinIcon,
     InfoIcon,
     RepeatIcon,
-    SaveIcon
+    SaveIcon,
+    XIcon
 } from "lucide-react"
 import { updateSchedule } from "@/actions/schedules"
 import { toast } from "sonner"
@@ -132,7 +133,7 @@ export function EditScheduleForm({ schedule, employees, departments, locations, 
         if (schedule.Team) return "team"
         if (schedule.department) return "department"
         if (schedule.location) return "location"
-        return "individual"
+        return "none"
     }
 
     const [formData, setFormData] = useState({
@@ -146,13 +147,27 @@ export function EditScheduleForm({ schedule, employees, departments, locations, 
         breakDuration: schedule.breakDuration || 30,
         isRecurring: schedule.isRecurring,
         recurrence: schedule.recurrence || "WEEKLY",
-        recurrenceDays: schedule.recurrenceDays ? schedule.recurrenceDays.split(',') : [],
+        recurrenceDays: (() => {
+            // Properly parse the JSON recurrenceDays field
+            if (!schedule.recurrenceDays) return []
+            try {
+                return JSON.parse(schedule.recurrenceDays)
+            } catch (error) {
+                console.error('Error parsing recurrenceDays:', error)
+                // Fallback for corrupted data - try to extract day names
+                const dayMatches = schedule.recurrenceDays.match(/"(MON|TUE|WED|THU|FRI|SAT|SUN)"/g)
+                if (dayMatches) {
+                    return [...new Set(dayMatches.map(match => match.replace(/"/g, '')))]
+                }
+                return []
+            }
+        })(),
         recurrenceEnd: "",
         assignmentType: getAssignmentType(),
-        userId: schedule.user?.id || "",
-        teamId: schedule.Team?.id || "",
-        departmentId: schedule.department?.id || "",
-        locationId: schedule.location?.id || ""
+        userId: schedule.user?.id || "none",
+        teamId: schedule.Team?.id || "none",
+        departmentId: schedule.department?.id || "none",
+        locationId: schedule.location?.id || "none"
     })
 
     const handleInputChange = (field: keyof typeof formData, value: string | number | boolean) => {
@@ -166,7 +181,7 @@ export function EditScheduleForm({ schedule, employees, departments, locations, 
         setFormData(prev => ({
             ...prev,
             recurrenceDays: prev.recurrenceDays.includes(day)
-                ? prev.recurrenceDays.filter(d => d !== day)
+                ? prev.recurrenceDays.filter((d: string) => d !== day)
                 : [...prev.recurrenceDays, day]
         }))
     }
@@ -189,10 +204,10 @@ export function EditScheduleForm({ schedule, employees, departments, locations, 
                 recurrence: formData.isRecurring ? formData.recurrence : undefined,
                 recurrenceDays: formData.isRecurring && formData.recurrenceDays.length > 0 ? formData.recurrenceDays : undefined,
                 recurrenceEnd: formData.isRecurring && formData.recurrenceEnd ? formData.recurrenceEnd : undefined,
-                userId: formData.assignmentType === "individual" ? formData.userId : undefined,
-                teamId: formData.assignmentType === "team" ? formData.teamId : undefined,
-                departmentId: formData.assignmentType === "department" ? formData.departmentId : undefined,
-                locationId: formData.assignmentType === "location" ? formData.locationId : undefined
+                userId: formData.assignmentType === "individual" && formData.userId && formData.userId !== "none" ? formData.userId : null,
+                teamId: formData.assignmentType === "team" && formData.teamId && formData.teamId !== "none" ? formData.teamId : null,
+                departmentId: formData.assignmentType === "department" && formData.departmentId && formData.departmentId !== "none" ? formData.departmentId : null,
+                locationId: formData.assignmentType === "location" && formData.locationId && formData.locationId !== "none" ? formData.locationId : null
             })
 
             if (result.success) {
@@ -531,7 +546,19 @@ export function EditScheduleForm({ schedule, employees, departments, locations, 
                                 </Tooltip>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                                <Card
+                                    className={`cursor-pointer transition-colors ${formData.assignmentType === "none" ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
+                                        }`}
+                                    onClick={() => handleInputChange("assignmentType", "none")}
+                                >
+                                    <CardContent className="p-4 text-center">
+                                        <XIcon className="h-8 w-8 mx-auto mb-2 text-gray-600" />
+                                        <div className="font-medium">None</div>
+                                        <div className="text-xs text-gray-500">No specific assignment</div>
+                                    </CardContent>
+                                </Card>
+
                                 <Card
                                     className={`cursor-pointer transition-colors ${formData.assignmentType === "individual" ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
                                         }`}
@@ -591,6 +618,9 @@ export function EditScheduleForm({ schedule, employees, departments, locations, 
                                         <SelectValue placeholder="Choose an employee..." />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem value="none">
+                                            <span className="text-gray-500 italic">No value</span>
+                                        </SelectItem>
                                         {employees.map((employee) => (
                                             <SelectItem key={employee.id} value={employee.id}>
                                                 <div className="flex items-center space-x-2">
@@ -619,6 +649,9 @@ export function EditScheduleForm({ schedule, employees, departments, locations, 
                                         <SelectValue placeholder="Choose a team..." />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem value="none">
+                                            <span className="text-gray-500 italic">No value</span>
+                                        </SelectItem>
                                         {teams.map((team) => (
                                             <SelectItem key={team.id} value={team.id}>
                                                 <div className="flex items-center space-x-2">
@@ -644,6 +677,9 @@ export function EditScheduleForm({ schedule, employees, departments, locations, 
                                         <SelectValue placeholder="Choose a department..." />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem value="none">
+                                            <span className="text-gray-500 italic">No value</span>
+                                        </SelectItem>
                                         {departments.map((department) => (
                                             <SelectItem key={department.id} value={department.id}>
                                                 <div className="flex items-center space-x-2">
@@ -669,6 +705,9 @@ export function EditScheduleForm({ schedule, employees, departments, locations, 
                                         <SelectValue placeholder="Choose a location..." />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem value="none">
+                                            <span className="text-gray-500 italic">No value</span>
+                                        </SelectItem>
                                         {locations.map((location) => (
                                             <SelectItem key={location.id} value={location.id}>
                                                 <div>

@@ -569,4 +569,53 @@ export const ourFileRouter = {
 
 This comprehensive approach to onboarding resulted in a significant improvement in user experience, with clear visual feedback, helpful guidance, and engaging interactions that set users up for success with the SmartClock platform.
 
+### 20. Null vs Undefined in Form Data Handling
+
+**Challenge:** Clearing database fields through form submissions when using optional fields.
+
+**Lesson:** Distinguish between `undefined` (don't update) and `null` (clear field) for proper database operations:
+
+**Problem:**
+- Forms passing `undefined` for clearing fields
+- Database update functions ignoring `undefined` values
+- Existing data remaining when user wants to clear assignments
+
+**Solution:**
+```typescript
+// Form submission - pass null for clearing, undefined for no change
+const updateData = {
+  userId: formData.assignmentType === "individual" && formData.userId && formData.userId !== "none" 
+    ? formData.userId   // Keep existing value
+    : null,             // Clear field (not undefined)
+  teamId: formData.assignmentType === "team" && formData.teamId && formData.teamId !== "none" 
+    ? formData.teamId 
+    : null
+}
+
+// Action function - accept null values in types
+export async function updateSchedule(scheduleId: string, data: {
+  userId?: string | null,      // Allow null to clear
+  teamId?: string | null,
+  // ... other fields
+}) {
+  const updateData: any = {}
+  
+  // Always update when not undefined (includes null for clearing)
+  if (data.userId !== undefined) updateData.userId = data.userId
+  if (data.teamId !== undefined) updateData.teamId = data.teamId
+  
+  // This will set null in database, clearing the field
+  await prisma.schedule.update({ where: { id }, data: updateData })
+}
+```
+
+**Key Insights:**
+- `undefined` = "don't change this field"
+- `null` = "clear this field in the database"
+- TypeScript types should reflect this: `string | null` for clearable fields
+- UI should provide "No value" options that map to `null`
+- Always test field clearing functionality explicitly
+
+This pattern is crucial for any form that needs to clear optional database fields.
+
 This document will continue to evolve as the SmartClock platform grows and new challenges are encountered.

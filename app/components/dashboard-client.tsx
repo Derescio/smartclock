@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import ClockInOut from "./clock-in-out"
 import RecentActivity from "./recent-activity"
 import QuickStats from "./quick-stats"
-import { getTodaysSchedule } from "@/actions"
+import { getTodaysSchedule, getUserSchedulesSimple } from "@/actions"
 
 interface Schedule {
     id: string
@@ -49,12 +49,16 @@ export default function DashboardClient() {
     const loadTodaysSchedule = async () => {
         try {
             setLoading(true)
-            const result = await getTodaysSchedule()
-            if (result.success && result.schedules) {
-                setTodaysSchedules(result.schedules)
+            const todayResult = await getTodaysSchedule()
+            
+            if (todayResult.success && todayResult.schedules) {
+                setTodaysSchedules(todayResult.schedules)
+            } else {
+                setTodaysSchedules([])
             }
         } catch (error) {
             console.error("Failed to load today's schedule:", error)
+            setTodaysSchedules([])
         } finally {
             setLoading(false)
         }
