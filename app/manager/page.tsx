@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { UsersIcon, MapPinIcon, TrendingUpIcon } from "lucide-react"
+import { UsersIcon, MapPinIcon, TrendingUpIcon, BarChart3Icon, CheckCircleIcon, CalendarIcon, DownloadIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -112,18 +112,31 @@ export default async function ManagerDashboard() {
                         </Card>
 
                         <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center font-heading">
-                                    <TrendingUpIcon className="h-5 w-5 mr-2 text-blue-600" />
-                                    Reports & Analytics
+                            <CardHeader className="pb-3">
+                                <CardTitle className="flex items-center space-x-2">
+                                    <TrendingUpIcon className="h-5 w-5 text-pink-600" />
+                                    <span>Reports & Analytics</span>
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-3">
-                                <Button className="w-full btn-secondary">Attendance Report</Button>
-                                <Button variant="outline" className="w-full">
+                            <CardContent className="space-y-2">
+                                <Link href="/manager/reports">
+                                    <Button variant="outline" className="w-full justify-start">
+                                        <BarChart3Icon className="h-4 w-4 mr-2" />
+                                        Attendance Report
+                                    </Button>
+                                </Link>
+                                <Link href="/manager/reports/timesheets">
+                                    <Button variant="outline" className="w-full justify-start">
+                                        <CheckCircleIcon className="h-4 w-4 mr-2" />
+                                        Approve Timesheets
+                                    </Button>
+                                </Link>
+                                <Button variant="outline" className="w-full justify-start">
+                                    <CalendarIcon className="h-4 w-4 mr-2" />
                                     Hours Summary
                                 </Button>
-                                <Button variant="outline" className="w-full">
+                                <Button variant="outline" className="w-full justify-start">
+                                    <DownloadIcon className="h-4 w-4 mr-2" />
                                     Export Data
                                 </Button>
                             </CardContent>

@@ -8,10 +8,25 @@ export async function getOrganizationSchedules() {
   try {
     const user = await requireRole(['MANAGER', 'ADMIN'])
 
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Start of today
+
     const schedules = await prisma.schedule.findMany({
       where: {
         organizationId: user.organizationId,
-        isActive: true
+        isActive: true,
+        // Filter out past non-recurring schedules
+        OR: [
+          // Include all recurring schedules (regardless of start date)
+          { isRecurring: true },
+          // Include non-recurring schedules that are today or in the future
+          {
+            isRecurring: false,
+            startDate: {
+              gte: today
+            }
+          }
+        ]
       },
       include: {
         user: {
@@ -34,6 +49,13 @@ export async function getOrganizationSchedules() {
             id: true,
             name: true,
             address: true
+          }
+        },
+        Team: {
+          select: {
+            id: true,
+            name: true,
+            color: true
           }
         },
         creator: {
@@ -545,6 +567,13 @@ export async function getTodaysSchedule() {
     const endOfDay = new Date(today)
     endOfDay.setHours(23, 59, 59, 999)
 
+    // Get user's team IDs first to avoid nested queries
+    const userTeams = await prisma.teamMember.findMany({
+      where: { userId: user.id },
+      select: { teamId: true }
+    })
+    const userTeamIds = userTeams.map(tm => tm.teamId)
+
     // Find schedules for today that apply to this user
     const schedules = await prisma.schedule.findMany({
       where: {
@@ -554,29 +583,26 @@ export async function getTodaysSchedule() {
         OR: [
           // Direct assignment to user
           { userId: user.id },
-          // Department assignment
-          { 
+          // Department assignment (if user has department)
+          ...(user.departmentId ? [{ 
             departmentId: user.departmentId,
             userId: null
-          },
-          // Location assignment
-          { 
+          }] : []),
+          // Location assignment (if user has location)
+          ...(user.locationId ? [{ 
             locationId: user.locationId,
             userId: null,
             departmentId: null
-          },
-          // Team assignment
-          {
+          }] : []),
+          // Team assignment - fix the nested query issue
+          ...(userTeamIds.length > 0 ? [{
             teamId: {
-              in: await prisma.teamMember.findMany({
-                where: { userId: user.id },
-                select: { teamId: true }
-              }).then(members => members.map(m => m.teamId))
+              in: userTeamIds
             },
             userId: null,
             departmentId: null,
             locationId: null
-          }
+          }] : [])
         ],
         AND: [
           {
@@ -635,14 +661,26 @@ export async function getTodaysSchedule() {
       if (!schedule.isRecurring) return true
       
       if (schedule.recurrenceDays) {
-        const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-        const todayDay = dayNames[today.getDay()]
-        const recurrenceDays = JSON.parse(schedule.recurrenceDays)
-        return recurrenceDays.includes(todayDay)
+        try {
+          const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+          const todayDay = dayNames[today.getDay()]
+          const recurrenceDays = JSON.parse(schedule.recurrenceDays)
+          return recurrenceDays.includes(todayDay)
+        } catch (error) {
+          console.error('Error parsing recurrence days:', error)
+          return false
+        }
       }
       
       return true
     })
+
+    // Debug logging for team schedules
+    if (userTeamIds.length > 0) {
+      console.log(`User ${user.id} is member of teams:`, userTeamIds)
+      const teamSchedulesCount = todaySchedules.filter(s => s.teamId).length
+      console.log(`Found ${teamSchedulesCount} team schedules for today`)
+    }
 
     return { success: true, schedules: todaySchedules }
   } catch (error) {

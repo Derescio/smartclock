@@ -81,7 +81,11 @@ export {
   getEmployeeTimesheets,
   generateTimesheetFromClockEvents,
   getTimesheetById,
-  getWeeklyTimesheet
+  getWeeklyTimesheet,
+  getAllPendingTimesheets,
+  approveTimesheet,
+  rejectTimesheet,
+  bulkApproveTimesheets
 } from './timesheets'
 
 // Team Management (Teams Feature)

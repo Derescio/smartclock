@@ -68,14 +68,21 @@ export function TimesheetClient() {
     const [endDate, setEndDate] = useState("")
     const [selectedWeek, setSelectedWeek] = useState("")
 
-    // Set default dates (current week)
+    // Set default dates (current week - Monday to Sunday)
     useEffect(() => {
         const today = new Date()
+
+        // Calculate Monday of current week (ISO week starts on Monday)
+        const dayOfWeek = today.getDay() // 0 = Sunday, 1 = Monday, etc.
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1 // Sunday = 6 days from Monday
+
         const startOfWeek = new Date(today)
-        startOfWeek.setDate(today.getDate() - today.getDay()) // Sunday
+        startOfWeek.setDate(today.getDate() - daysFromMonday) // Go back to Monday
+        startOfWeek.setHours(0, 0, 0, 0)
 
         const endOfWeek = new Date(startOfWeek)
-        endOfWeek.setDate(startOfWeek.getDate() + 6) // Saturday
+        endOfWeek.setDate(startOfWeek.getDate() + 6) // Sunday
+        endOfWeek.setHours(23, 59, 59, 999)
 
         setStartDate(startOfWeek.toISOString().split('T')[0])
         setEndDate(endOfWeek.toISOString().split('T')[0])
@@ -86,6 +93,7 @@ export function TimesheetClient() {
         try {
             setLoading(true)
             const result = await getEmployeeTimesheets()
+
             if (result.success && result.timesheets) {
                 setTimesheets(result.timesheets)
             }
@@ -124,12 +132,28 @@ export function TimesheetClient() {
             return
         }
 
+        // Validate date range
+        const start = new Date(startDate)
+        const end = new Date(endDate)
+
+        if (start > end) {
+            toast.error("Start date must be before end date")
+            return
+        }
+
         try {
             setGenerating(true)
             const result = await generateTimesheetFromClockEvents(startDate, endDate)
+
             if (result.success) {
-                toast.success("Timesheet generated successfully!")
+                const actualDates = result.actualDates ? `${result.actualDates.start} to ${result.actualDates.end}` : `${startDate} to ${endDate}`
+                if (result.updated) {
+                    toast.success(`Timesheet updated successfully! Previous rejected timesheet has been resubmitted for approval. (${actualDates})`)
+                } else {
+                    toast.success(`Timesheet generated successfully for ${actualDates}!`)
+                }
                 loadTimesheets() // Refresh the list
+                loadWeeklyData(selectedWeek) // Refresh weekly data
             } else {
                 toast.error(result.error || "Failed to generate timesheet")
             }
@@ -157,11 +181,21 @@ export function TimesheetClient() {
     }
 
     const formatDate = (date: Date) => {
-        return new Date(date).toLocaleDateString('en-US', {
+        // Extract the date part from the ISO string to avoid timezone issues
+        const isoString = new Date(date).toISOString()
+        const datePart = isoString.split('T')[0] // Get YYYY-MM-DD
+        const [year, month, day] = datePart.split('-').map(Number)
+
+        // Create a new date in local timezone to format correctly
+        const localDate = new Date(year, month - 1, day)
+
+        const formatted = localDate.toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
             year: 'numeric'
         })
+
+        return formatted
     }
 
     const formatHours = (hours: number) => {
@@ -169,7 +203,17 @@ export function TimesheetClient() {
     }
 
     const getDayName = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', { weekday: 'short' })
+        // Parse the YYYY-MM-DD string directly to avoid timezone issues
+        const [year, month, day] = dateString.split('-').map(Number)
+        const localDate = new Date(year, month - 1, day)
+        return localDate.toLocaleDateString('en-US', { weekday: 'short' })
+    }
+
+    const formatDateForDisplay = (dateString: string) => {
+        // Parse the YYYY-MM-DD string directly to avoid timezone issues
+        const [year, month, day] = dateString.split('-').map(Number)
+        const localDate = new Date(year, month - 1, day)
+        return localDate.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
     }
 
     return (
@@ -214,7 +258,7 @@ export function TimesheetClient() {
                                                         {getDayName(day.date)}
                                                     </span>
                                                     <span className="text-sm text-gray-500">
-                                                        {new Date(day.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}
+                                                        {formatDateForDisplay(day.date)}
                                                     </span>
                                                 </div>
                                                 <div className="text-right">
@@ -286,6 +330,11 @@ export function TimesheetClient() {
                             <p className="text-xs text-gray-500">
                                 This will create a timesheet based on your clock in/out events for the selected period.
                             </p>
+                            <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                                <p className="text-xs text-blue-800">
+                                    <strong>Note:</strong> You can only have one timesheet per period. If you already have a pending or approved timesheet for overlapping dates, you'll need to wait for manager approval/rejection before generating a new one.
+                                </p>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
