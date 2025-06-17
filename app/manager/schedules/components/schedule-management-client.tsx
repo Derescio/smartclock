@@ -120,20 +120,20 @@ export function ScheduleManagementClient({ schedules }: ScheduleManagementClient
         // For non-recurring schedules, they're active only on the specific date
         // If no end date, it's a single-day schedule
         if (!endDate) {
-            return startDate.getTime() === today.getTime() ? 'active' : 
-                   startDate > today ? 'upcoming' : 'inactive'
+            return startDate.getTime() === today.getTime() ? 'active' :
+                startDate > today ? 'upcoming' : 'inactive'
         }
 
         // Multi-day non-recurring schedule
         const isInRange = startDate <= today && endDate >= today
         if (isInRange) return 'active'
-        
+
         return startDate > today ? 'upcoming' : 'inactive'
     }
 
     const getActivityBadge = (schedule: Schedule) => {
         const activityStatus = getActivityStatus(schedule)
-        
+
         switch (activityStatus) {
             case 'active':
                 return <Badge variant="default" className="bg-green-600">Active</Badge>
@@ -154,10 +154,10 @@ export function ScheduleManagementClient({ schedules }: ScheduleManagementClient
             schedule.department?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             schedule.location?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             schedule.Team?.name.toLowerCase().includes(searchTerm.toLowerCase())
-        
+
         // Activity filter
         if (activityFilter === "all") return matchesSearch
-        
+
         const activityStatus = getActivityStatus(schedule)
         return matchesSearch && activityStatus === activityFilter
     })
